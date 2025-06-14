@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [0.3.2] - 2025-06-14
+
+### Fixed
+
+- Fixed build configuration to correctly include resource files in wheel package
+
 ## [0.3.1] - 2025-06-14
 
 ### Fixed
