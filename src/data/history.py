@@ -10,7 +10,7 @@ Note:
 import json
 import os
 from datetime import datetime
-from pathlib import Path
+import platformdirs
 
 
 class HistoryManager:
@@ -20,11 +20,24 @@ class HistoryManager:
         """Initialize the HistoryManager.
 
         Args:
-            history_file: Path to the records JSON file.
+            history_file: Path to the records JSON file. If None, uses default location.
         """
-        self.records_file = history_file or os.path.join(
-            Path(__file__).parent.parent.parent, "data", "history.json"
-        )
+        if history_file:
+            self.records_file = history_file
+        else:
+            # Use platformdirs to get the appropriate user data directory
+            data_dir = platformdirs.user_data_dir("termtypr")
+            # Create the directory if it doesn't exist
+            os.makedirs(data_dir, exist_ok=True)
+            self.records_file = os.path.join(data_dir, "history.json")
+            # Create empty history file if it doesn't exist
+            if not os.path.exists(self.records_file):
+                self._initialize_history_file()
+
+    def _initialize_history_file(self):
+        """Initialize an empty history file."""
+        with open(self.records_file, "w", encoding="utf-8") as f:
+            json.dump({"history": []}, f)
 
     def get_history(self) -> list[dict]:
         """Get all typing history.
