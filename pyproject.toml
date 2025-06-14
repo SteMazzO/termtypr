@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "termtypr"
-version = "0.3.0"
+version = "0.3.1"
 description = "A Python CLI application for practicing and improving typing speed"
 readme = "README.md"
 authors = [
@@ -30,6 +30,7 @@ dependencies = [
     "textual>=0.38.1",
     "plotext>=5.3.2",
     "typer>=0.9.0",
+    "platformdirs>=4.1.0",
 ]
 requires-python = ">=3.9"
 
@@ -50,6 +51,9 @@ termtypr = "src.main:cli"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"data" = "src/data/resources"
 
 [tool.hatch.envs.default]
 dependencies = [

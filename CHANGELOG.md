@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [0.3.1] - 2025-06-14
+
+### Fixed
+- Fixed data files not being included when installing from PyPI
+- Moved history storage to user's data directory using platformdirs
+- Added proper package data configuration in pyproject.toml
+
 ## [0.3.0] - 2025-06-14
 
 ### Added

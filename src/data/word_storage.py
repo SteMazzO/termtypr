@@ -1,8 +1,7 @@
 """Module for handling word storage and retrieval for typing tests"""
 
 import json
-import os
-from pathlib import Path
+import importlib.resources
 
 
 class WordStorage:
@@ -14,9 +13,12 @@ class WordStorage:
         Args:
             words_file: Path to the words JSON file.
         """
-        self.words_file = words_file or os.path.join(
-            Path(__file__).parent.parent.parent, "data", "words.json"
-        )
+        if words_file:
+            self.words_file = words_file
+        else:
+            # Use package resources to access data files
+            with importlib.resources.path('src.data.resources', 'words.json') as p:
+                self.words_file = str(p)
 
     def get_words(self) -> list[str]:
         """Get all words from the storage.
