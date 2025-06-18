@@ -102,30 +102,24 @@ class GameWordsView(Static):
         if not current_typed:
             return Text(word, style=self.theme_colors["current_word"])
 
-        word_text = Text()
-        correct_chars = 0
-
         # Find correct characters
+        correct_chars = 0
         for j, char in enumerate(current_typed):
             if j < len(word) and char == word[j]:
                 correct_chars += 1
             else:
                 break
 
-        # Build styled text
+        # If a wrong character was typed, show the whole word as incorrect
+        if correct_chars < len(current_typed):
+            return Text(word, style=self.theme_colors["incorrect"])
+
+        # Otherwise, show correct part and the rest as current_word
+        word_text = Text()
         if correct_chars > 0:
             word_text.append(word[:correct_chars], style=self.theme_colors["correct"])
-
-        if correct_chars < len(current_typed):
-            word_text.append(
-                current_typed[correct_chars:], style=self.theme_colors["incorrect"]
-            )
-
         if correct_chars < len(word):
-            word_text.append(
-                word[correct_chars:], style=self.theme_colors["current_word"]
-            )
-
+            word_text.append(word[correct_chars:], style=self.theme_colors["current_word"])
         return word_text
 
 
