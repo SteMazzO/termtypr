@@ -2,7 +2,7 @@
 
 import json
 import random
-from pathlib import Path
+import importlib.resources
 
 
 class PhraseGenerator:
@@ -10,9 +10,9 @@ class PhraseGenerator:
 
     def __init__(self):
         """Initialize the phrase generator."""
-        self.phrases_file = (
-            Path(__file__).parent.parent.parent / "data" / "phrases.json"
-        )
+        # Use package resources to access data files
+        with importlib.resources.path("src.data.resources", "phrases.json") as p:
+            self.phrases_file = str(p)
         self._phrases = self._load_phrases()
 
     def _load_phrases(self) -> list[str]:
