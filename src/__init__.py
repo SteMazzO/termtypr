@@ -1,3 +1,3 @@
 """TermTypr - A Python CLI application for practicing and improving typing speed."""
 
-__version__ = "0.3.2"
+__version__ = "0.3.3"
