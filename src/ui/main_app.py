@@ -253,9 +253,8 @@ class TermTypr(App):
                 if " " in input_text:
                     # Process as complete word
                     word = input_text.strip()
-                    if word:
-                        self._process_game_input(word, is_complete=True)
-                        event.input.value = ""
+                    self._process_game_input(word, is_complete=True)
+                    event.input.value = ""
                     return
 
                 # Process partial input for real-time feedback
