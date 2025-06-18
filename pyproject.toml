@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "termtypr"
-version = "0.3.2"
+version = "0.3.3"
 description = "A Python CLI application for practicing and improving typing speed"
 readme = "README.md"
 authors = [
