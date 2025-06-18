@@ -7,7 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
 
+- fix: do not display errors in words panel when typing incorrect letters
+- fix: allow skipping current word by pressing space on empty input
 
 ## [0.3.2] - 2025-06-14
 
