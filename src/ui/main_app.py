@@ -142,7 +142,7 @@ class TermTypr(App):
         # Update input placeholder and clear input
         input_field = self.query_one(Input)
         input_field.placeholder = (
-            "Use arrow keys to navigate menu, ENTER to select, 'q' to quit"
+            "Use arrow keys to navigate menu, ENTER to select, 'Ctrl+Q' to quit"
         )
         input_field.value = ""
 
@@ -160,9 +160,7 @@ class TermTypr(App):
 
         # Update input placeholder
         input_field = self.query_one(Input)
-        input_field.placeholder = (
-            "Type the words shown above... (Press SPACE to submit word, 'q' to quit)"
-        )
+        input_field.placeholder = "Type the words shown above... (Press SPACE to submit word, 'Ctrl+Q' to quit, 'ESCAPE' to return to menu)"
         input_field.value = ""
 
     def _show_results_view(self, results: dict) -> None:
@@ -191,7 +189,7 @@ class TermTypr(App):
         if event.key in ["ctrl+q", "ctrl+c"]:
             # Quit the application
             self.exit()
-            return        # Context-specific key handlers
+            return  # Context-specific key handlers
         if self.current_view == "menu":
             self._handle_menu_keys(event)
         elif self.current_view == "results":
