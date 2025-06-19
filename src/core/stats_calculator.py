@@ -69,7 +69,9 @@ class StatsCalculator:
             return 0.0
 
         # Calculate accuracy considering typos
-        accuracy = ((total_chars_typed - typo_count) / total_chars_typed) * 100
+        # Ensure accuracy cannot be negative by capping typo_count at total_chars_typed
+        effective_typos = min(typo_count, total_chars_typed)
+        accuracy = ((total_chars_typed - effective_typos) / total_chars_typed) * 100
 
         return round(accuracy, 2)
 
