@@ -28,22 +28,14 @@ class GameWordsView(Static):
         """Update the display data from game."""
         new_words = display_data.get("target_words", [])
 
-        # Check if the number of words has changed significantly
-        # This indicates a switch to a different test length
-        word_count_changed = len(new_words) != len(self.words)
-
         self.words = new_words
         self.typed_words = display_data.get("typed_words", [])
         self.current_idx = display_data.get("current_word_index", 0)
         self.current_input = display_data.get("current_input", "")
 
-        # Force layout refresh if word count changed significantly
-        if word_count_changed:
-            self.refresh(layout=True)
-            if self.parent:
-                self.parent.refresh(layout=True)
-        else:
-            self.refresh()
+        self.refresh(layout=True)
+        if self.parent:
+            self.parent.refresh(layout=True)
 
     def set_theme(self, theme_name: str) -> None:
         """Set the theme for the words view."""
