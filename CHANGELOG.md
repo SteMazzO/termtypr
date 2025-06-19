@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix: cap typo count to prevent negative accuracy calculation
 - fix: resolve word panel resizing issues
 
+### Changed
+- refactor: simplify game classes & remove redundant code
+
 ## [0.3.3] - 2025-06-18
 
 ### Fixed
