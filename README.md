@@ -51,5 +51,5 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 ## Acknowledgments
 
-- Inspired by typing test platforms such as [10FastFingers](https://10fastfingers.com/) and [TypeRacer](https://play.typeracer.com/)
+- Inspired by the typing test CLI tool [MiType](https://github.com/Mithil467/mitype), as well as online platforms like [10FastFingers](https://10fastfingers.com/) and [TypeRacer](https://play.typeracer.com/)
 - Text samples are sourced from [Typeracer Data](http://typeracerdata.com/texts).
