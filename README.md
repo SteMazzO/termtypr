@@ -35,7 +35,7 @@ termtypr
 ### Install from Source
 
 ```bash
-git clone https://github.com/your-username/termtypr.git
+git clone https://github.com/SteMazzO/termtypr.git
 cd termtypr
 pip install -e .
 termtypr
