@@ -6,7 +6,9 @@ class StatsCalculator:
 
     @staticmethod
     def calculate_wpm(
-        typed_words: list[str], target_words: list[str], elapsed_time_seconds: float
+        typed_words: list[str],
+        target_words: list[str],
+        elapsed_time_seconds: float,
     ) -> float:
         """Calculate words per minute (WPM).
 
@@ -22,26 +24,29 @@ class StatsCalculator:
         if not elapsed_time_seconds:
             return 0.0
 
-        # Standard calculation: (characters typed / 5) / minutes
-        # We use 5 characters as an average word length standard
+        # Calculate uncorrected errors at character level
+        uncorrected_errors = 0
+        for typed, target in zip(typed_words, target_words):
+            # Count character differences
+            max_len = max(len(typed), len(target))
+            for i in range(max_len):
+                typed_char = typed[i] if i < len(typed) else ""
+                target_char = target[i] if i < len(target) else ""
+                if typed_char != target_char:
+                    uncorrected_errors += 1
 
-        # Ensure last word is not counted if it is incomplete
-        if typed_words and typed_words[-1] != target_words[len(typed_words) - 1]:
-            typed_words = typed_words[:-1]
+        # Calculate total characters including spaces between words
+        # Most typing tests count spaces in the character total
+        total_chars = sum(len(word) for word in typed_words)
+        if len(typed_words) > 1:
+            total_chars += len(typed_words) - 1  # Add spaces between words
 
-        # Only count correctly typed words
-        correct_words = [
-            typed for typed, target in zip(typed_words, target_words) if typed == target
-        ]
-
-        if not correct_words or not elapsed_time_seconds:
-            return 0.0
-
-        total_chars = sum(len(word) for word in correct_words)
         minutes = elapsed_time_seconds / 60
 
-        wpm = (total_chars / 5) / minutes
-        return round(wpm, 2)
+        # Calculate Net WPM using correct formula
+        net_wpm = (total_chars / 5 - uncorrected_errors) / minutes
+
+        return round(max(net_wpm, 0), 2)
 
     @staticmethod
     def calculate_accuracy(
