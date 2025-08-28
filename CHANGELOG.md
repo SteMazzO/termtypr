@@ -7,7 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.5] - 2025-08-28
 
+### Changed
+
+- Trim word list
+
+### Fixed
+
+- WPM Calculation
 
 ## [0.3.4] - 2025-06-19
 
