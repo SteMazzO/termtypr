@@ -19,12 +19,7 @@ class MenuState(Enum):
 class GameMenuItem:
     """Represents a game option in the menu."""
 
-    def __init__(
-        self,
-        game_class: type[BaseGame],
-        display_name: str,
-        description: str
-    ):
+    def __init__(self, game_class: type[BaseGame], display_name: str, description: str):
         self.game_class = game_class
         self.display_name = display_name
         self.description = description
@@ -40,17 +35,17 @@ class MenuSystem:
     def __init__(self):
         self.state = MenuState.MAIN_MENU
         self.current_game: BaseGame | None = None
-        self.selected_menu_index = 0        # Register available games
+        self.selected_menu_index = 0  # Register available games
         self.game_menu_items: list[GameMenuItem] = [
             GameMenuItem(
                 RandomWordsGame,
                 "Random Words",
-                "Type randomly selected words as fast and accurately as possible"
+                "Type randomly selected words as fast and accurately as possible",
             ),
             GameMenuItem(
                 PhraseTypingGame,
                 "Phrase Typing",
-                "Type complete phrases and quotes to improve your typing flow"
+                "Type complete phrases and quotes to improve your typing flow",
             ),
         ]
 

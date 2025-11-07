@@ -1,8 +1,8 @@
 """Phrase generator for typing practice."""
 
+import importlib.resources
 import json
 import random
-import importlib.resources
 
 
 class PhraseGenerator:
