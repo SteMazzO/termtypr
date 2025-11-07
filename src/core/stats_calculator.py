@@ -44,7 +44,8 @@ class StatsCalculator:
         minutes = elapsed_time_seconds / 60
 
         # Calculate Net WPM using correct formula
-        net_wpm = (total_chars / 5 - uncorrected_errors) / minutes
+        # Standard word length is 5 characters
+        net_wpm = ((total_chars - uncorrected_errors) / 5) / minutes
 
         return round(max(net_wpm, 0), 2)
 
