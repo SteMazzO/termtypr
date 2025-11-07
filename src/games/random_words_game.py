@@ -7,10 +7,11 @@ from src.games.base_game import BaseGame, GameStatus
 class RandomWordsGame(BaseGame):
     """A typing game that presents random words for the user to type."""
 
-    def __init__(self):
+    def __init__(self, save_history: bool = True):
         super().__init__(
             name="Random Words",
             description="Type randomly selected words as fast and accurately as possible",
+            save_history=save_history,
         )
 
         # Game configuration

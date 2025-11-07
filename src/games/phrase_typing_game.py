@@ -7,10 +7,11 @@ from src.games.base_game import BaseGame, GameStatus
 class PhraseTypingGame(BaseGame):
     """A typing game that presents phrases broken into words for the user to type."""
 
-    def __init__(self):
+    def __init__(self, save_history: bool = True):
         super().__init__(
             name="Phrase Typing",
             description="Type complete phrases and quotes to improve your typing flow",
+            save_history=save_history,
         )
 
         # Game configuration

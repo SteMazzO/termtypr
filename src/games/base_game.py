@@ -14,12 +14,20 @@ from src.domain.models.game_state import GameStatus
 class BaseGame(ABC):
     """Abstract base class for all typing games."""
 
-    def __init__(self, name: str, description: str):
+    def __init__(self, name: str, description: str, save_history: bool = True):
+        """Initialize the base game.
+
+        Args:
+            name: Name of the game
+            description: Description of the game
+            save_history: Whether to save to history (for backward compatibility)
+        """
         self.name = name
         self.description = description
         self.status = GameStatus.NOT_STARTED
         self.result: Optional[GameResult] = None
-        self.history_manager = HistoryManager()
+        self.save_history = save_history
+        self.history_manager = HistoryManager() if save_history else None
 
         # Game state
         self.target_words: list[str] = []
@@ -218,16 +226,21 @@ class BaseGame(ABC):
         )
 
         # Check for new record
-        best_record = self.history_manager.get_best_record()
-        is_new_record = (
-            stats["wpm"] > best_record.get("wpm", 0) if best_record else True
-        )
-        previous_best = best_record.get("wpm", 0) if best_record else None
+        best_record = None
+        is_new_record = False
+        previous_best = None
 
-        # Save to history
-        self.history_manager.add_to_history(
-            stats["wpm"], stats["accuracy"], elapsed_time, self.name
-        )
+        if self.save_history and self.history_manager:
+            best_record = self.history_manager.get_best_record()
+            is_new_record = (
+                stats["wpm"] > best_record.get("wpm", 0) if best_record else True
+            )
+            previous_best = best_record.get("wpm", 0) if best_record else None
+
+            # Save to history
+            self.history_manager.add_to_history(
+                stats["wpm"], stats["accuracy"], elapsed_time, self.name
+            )
 
         # Create result object
         self.result = GameResult(

@@ -1,15 +1,16 @@
 """Tests for Pydantic settings."""
 
-import pytest
 from pathlib import Path
+
+import pytest
 from pydantic import ValidationError
 
 from src.domain.config.settings import (
+    THEME_CONFIGS,
     ApplicationSettings,
     GameSettings,
     ThemeColors,
     ThemeName,
-    THEME_CONFIGS,
     get_theme_colors,
 )
 
