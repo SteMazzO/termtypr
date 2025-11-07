@@ -2,62 +2,13 @@
 
 import time
 from abc import ABC, abstractmethod
-from enum import Enum
+from datetime import datetime
 from typing import Any, Optional
 
 from src.core.stats_calculator import StatsCalculator
 from src.data.history import HistoryManager
-
-
-class GameStatus(Enum):
-    """Status of a typing game."""
-
-    NOT_STARTED = "not_started"
-    READY = "ready"
-    ACTIVE = "active"
-    PAUSED = "paused"
-    COMPLETED = "completed"
-    CANCELLED = "cancelled"
-
-
-class GameResult:
-    """Result of a completed typing game."""
-
-    def __init__(
-        self,
-        wpm: float,
-        accuracy: float,
-        duration: float,
-        total_characters: int,
-        correct_characters: int,
-        error_count: int,
-        is_new_record: bool = False,
-        previous_best: Optional[float] = None,
-        additional_data: Optional[dict[str, Any]] = None,
-    ):
-        self.wpm = wpm
-        self.accuracy = accuracy
-        self.duration = duration
-        self.total_characters = total_characters
-        self.correct_characters = correct_characters
-        self.error_count = error_count
-        self.is_new_record = is_new_record
-        self.previous_best = previous_best
-        self.additional_data = additional_data or {}
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert result to dictionary format."""
-        return {
-            "wpm": self.wpm,
-            "accuracy": self.accuracy,
-            "duration": self.duration,
-            "total_characters": self.total_characters,
-            "correct_characters": self.correct_characters,
-            "error_count": self.error_count,
-            "is_new_record": self.is_new_record,
-            "previous_best": self.previous_best,
-            **self.additional_data,
-        }
+from src.domain.models.game_result import GameResult
+from src.domain.models.game_state import GameStatus
 
 
 class BaseGame(ABC):
@@ -283,6 +234,8 @@ class BaseGame(ABC):
             wpm=stats["wpm"],
             accuracy=stats["accuracy"],
             duration=elapsed_time,
+            game_type=self.name,
+            timestamp=datetime.now(),
             total_characters=sum(
                 len(word) for word in self.target_words[: self.current_word_index]
             ),
@@ -294,14 +247,6 @@ class BaseGame(ABC):
             error_count=self.error_count,
             is_new_record=is_new_record,
             previous_best=previous_best,
-            additional_data={
-                "total_words": len(self.target_words),
-                "completion_percentage": (
-                    (self.current_word_index / len(self.target_words)) * 100
-                    if self.target_words
-                    else 0
-                ),
-            },
         )
 
         return self.result

@@ -7,9 +7,7 @@ from datetime import datetime
 import pytest
 
 from src.domain.models.game_result import GameResult
-from src.infrastructure.persistence.json_history_repository import (
-    JsonHistoryRepository,
-)
+from src.infrastructure.persistence.json_history_repository import JsonHistoryRepository
 
 
 @pytest.fixture
