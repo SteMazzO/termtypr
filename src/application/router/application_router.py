@@ -354,6 +354,14 @@ class ApplicationRouter:
         """
         return self.stats_service.get_recent_results(limit)
 
+    def get_all_games(self) -> list[GameResult]:
+        """Get all game results from history.
+
+        Returns:
+            List of all game results, newest first
+        """
+        return self.stats_service.get_all_results()
+
     def get_formatted_stats_table(self, limit: int = 10) -> list[dict[str, Any]]:
         """Get formatted statistics table data.
 

@@ -1,4 +1,4 @@
-"""New modular Textual application with menu system and game separation."""
+"""TermTypr Application"""
 
 from typing import Optional
 
@@ -6,10 +6,13 @@ from textual.app import App, ComposeResult
 from textual.containers import Container
 from textual.widgets import Footer, Header, Input
 
+from src.application.router.application_router import ApplicationRouter
 from src.config import THEMES
-from src.data.history import HistoryManager
-from src.games.base_game import GameStatus
-from src.menu.menu_system import MenuSystem
+from src.domain.models.game_result import GameResult
+from src.domain.models.game_state import GameState
+from src.infrastructure.persistence.json_history_repository import (
+    JsonHistoryRepository,
+)
 from src.ui.game_view import GameView
 from src.ui.main_menu_view import MainMenuView
 from src.ui.results_view import ResultsView
@@ -17,7 +20,7 @@ from src.ui.stats_view import StatsView
 
 
 class TermTypr(App):
-    """Main application class with modular design and menu system."""
+    """Main application class."""
 
     CSS = """
     Screen {
@@ -64,13 +67,14 @@ class TermTypr(App):
         # Set CSS variables for theme colors
         self.background = self.theme_colors["background"]
 
-        # Initialize subsystems
-        self.menu_system = MenuSystem()
-        self.history_manager = HistoryManager()
+        # Initialize application router with repository
+        history_repository = JsonHistoryRepository()
+        self.router = ApplicationRouter(history_repository)
 
         # UI state
         self.current_view: Optional[str] = None
-        self.last_started_game_index: Optional[int] = None  # Track last started game
+        self.last_game_result: Optional[GameResult] = None
+        self.last_selected_game_index: int = 0  # Track which game was last played
 
     def compose(self) -> ComposeResult:
         """Create child widgets."""
@@ -126,60 +130,71 @@ class TermTypr(App):
     def _show_main_menu(self) -> None:
         """Show the main menu and hide other views."""
         self.current_view = "menu"
+        self.router.return_to_main_menu()
 
-        # Reset menu system to ensure proper state
-        self.menu_system.return_to_main_menu()  # Show main menu, hide others
+        # Toggle view visibility
         self.query_one(MainMenuView).display = True
         self.query_one(GameView).display = False
         self.query_one(ResultsView).display = False
         self.query_one(StatsView).display = False
 
         # Update menu data
-        menu_data = self.menu_system.get_main_menu_data()
-        main_menu_view = self.query_one(MainMenuView)
-        main_menu_view.update_menu_data(menu_data)
+        self.query_one(MainMenuView).update_menu_data(
+            {
+                "title": "TermTypr - Typing Practice Games",
+                "subtitle": "Choose a typing practice mode:",
+                "games": self.router.get_available_games(),
+                "selected_index": self.router.selected_game_index,
+                "instructions": [
+                    "Use ↑/↓ arrow keys or numbers to navigate",
+                    "Press ENTER to select a game",
+                    "Press 'Ctrl+Q' to quit",
+                    "Press 'Ctrl+S' to view statistics",
+                ],
+            }
+        )
 
-        # Update input placeholder and clear input
+        # Update and focus input
         input_field = self.query_one(Input)
         input_field.placeholder = (
             "Use arrow keys to navigate menu, ENTER to select, 'Ctrl+Q' to quit"
         )
         input_field.value = ""
-
-        # Ensure input is focused
         self.call_after_refresh(input_field.focus)
 
     def _show_game_view(self) -> None:
         """Show the game view and hide other views."""
         self.current_view = "game"
-        # Show game view, hide others
+
+        # Toggle view visibility
         self.query_one(MainMenuView).display = False
         self.query_one(GameView).display = True
         self.query_one(ResultsView).display = False
         self.query_one(StatsView).display = False
 
-        # Update input placeholder
+        # Update input
         input_field = self.query_one(Input)
-        input_field.placeholder = "Type the words shown above... (Press SPACE to submit word, 'Ctrl+Q' to quit, 'ESCAPE' to return to menu)"
+        input_field.placeholder = (
+            "Type the words shown above... "
+            "(SPACE to submit, ESC to restart, Ctrl+Q to quit)"
+        )
         input_field.value = ""
 
     def _show_results_view(self, results: dict) -> None:
         """Show the results view with game results."""
         self.current_view = "results"
-        # Show results view, hide others
+
+        # Toggle view visibility
         self.query_one(MainMenuView).display = False
         self.query_one(GameView).display = False
         self.query_one(ResultsView).display = True
         self.query_one(StatsView).display = False
 
-        # Update results data
-        results_view = self.query_one(ResultsView)
-        results_view.update_results(results)
-
-        # Update input placeholder
+        # Update results and input
+        self.query_one(ResultsView).update_results(results)
         input_field = self.query_one(Input)
         input_field.placeholder = (
-            "Press ENTER to play again, 'ESCAPE' for main menu, 'Ctrl+Q' to quit"
+            "Press ENTER to play again, ESC for menu, Ctrl+Q to quit"
         )
         input_field.value = ""
 
@@ -200,10 +215,10 @@ class TermTypr(App):
     def _handle_menu_keys(self, event) -> None:
         """Handle key presses in main menu."""
         if event.key == "up":
-            self.menu_system.navigate_menu(-1)
+            self.router.navigate_game_selection(-1)
             self._update_menu_display()
         elif event.key == "down":
-            self.menu_system.navigate_menu(1)
+            self.router.navigate_game_selection(1)
             self._update_menu_display()
         elif event.key == "ctrl+s":
             self._show_stats()
@@ -224,9 +239,20 @@ class TermTypr(App):
 
     def _update_menu_display(self) -> None:
         """Update the menu display with current selection."""
-        menu_data = self.menu_system.get_main_menu_data()
-        main_menu_view = self.query_one(MainMenuView)
-        main_menu_view.update_menu_data(menu_data)
+        self.query_one(MainMenuView).update_menu_data(
+            {
+                "title": "TermTypr - Typing Practice Games",
+                "subtitle": "Choose a typing practice mode:",
+                "games": self.router.get_available_games(),
+                "selected_index": self.router.selected_game_index,
+                "instructions": [
+                    "Use ↑/↓ arrow keys or numbers to navigate",
+                    "Press ENTER to select a game",
+                    "Press 'Ctrl+Q' to quit",
+                    "Press 'Ctrl+S' to view statistics",
+                ],
+            }
+        )
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         """Handle input submission."""
@@ -242,31 +268,32 @@ class TermTypr(App):
 
     def on_input_changed(self, event: Input.Changed) -> None:
         """Handle real-time input changes for game."""
-        if self.current_view == "game" and self.menu_system.is_in_game():
-            current_game = self.menu_system.get_current_game()
-            if current_game:
-                input_text = event.input.value
+        if self.current_view != "game" or not self.router.is_game_active():
+            return
 
-                # Handle space bar for word completion in word games
-                if " " in input_text:
-                    # Process as complete word
-                    word = input_text.strip()
-                    self._process_game_input(word, is_complete=True)
-                    event.input.value = ""
-                    return
+        current_game = self.router.game_controller.current_game
+        if not current_game:
+            return
 
-                # Process partial input for real-time feedback
-                current_game.process_input(input_text, is_complete_input=False)
-                self._update_game_display()
+        input_text = event.input.value
+
+        # Handle space bar for word completion
+        if " " in input_text:
+            self._process_game_input(input_text.strip(), is_complete=True)
+            event.input.value = ""
+            return
+
+        # Process partial input for real-time feedback
+        current_game.process_input(input_text, is_complete_input=False)
+        self._update_game_display()
 
     def _start_selected_game(self) -> None:
         """Start the currently selected game."""
-        # For now, use default configuration
-        # TODO: Add configuration dialog for games that need it
-        if self.menu_system.start_selected_game():
-            self.last_started_game_index = (
-                self.menu_system.selected_menu_index
-            )  # Save last started game
+        # Save the selected game index for restart functionality
+        self.last_selected_game_index = self.router.selected_game_index
+
+        # Start game through router with default configuration
+        if self.router.start_game():
             self._show_game_view()
             self._update_game_display()
 
@@ -275,141 +302,132 @@ class TermTypr(App):
 
     def _process_game_input(self, word: str, is_complete: bool = True) -> None:
         """Process game input."""
-        if not self.menu_system.is_in_game():
+        if not self.router.is_game_active():
             return
 
-        current_game = self.menu_system.get_current_game()
-        if not current_game:
-            return
-
-        result = current_game.process_input(word, is_complete_input=is_complete)
-
-        # Update display
+        self.router.process_game_input(word, is_complete)
         self._update_game_display()
 
-        # Clear input if word was completed
         if is_complete:
-            input_field = self.query_one(Input)
-            input_field.value = ""
+            self.query_one(Input).value = ""
 
-        # Check if game is finished
-        if result.get("status") == "complete" or current_game.is_finished():
+        # Check if game finished
+        if self.router.game_controller.is_game_finished():
             self._finish_current_game()
 
     def _update_game_display(self) -> None:
         """Update the game display with current game state."""
-        if not self.menu_system.is_in_game():
+        if not self.router.is_game_active():
             return
 
-        current_game = self.menu_system.get_current_game()
-        if not current_game:
-            return
-
-        # Update words display
-        display_data = current_game.get_display_data()
-        game_view = self.query_one(GameView)
-        game_view.update_game_display(display_data)
+        display_data = self.router.get_game_display_data()
+        if display_data:
+            self.query_one(GameView).update_game_display(display_data)
 
     def _update_game_stats(self) -> None:
         """Update game statistics display."""
-        if not self.menu_system.is_in_game():
+        if not self.router.is_game_active():
             return
 
-        current_game = self.menu_system.get_current_game()
-        if not current_game:
+        stats = self.router.get_game_stats()
+        if not stats:
             return
 
-        # Get current stats
-        stats = current_game.get_current_stats()
-
-        # Get best record
-        best_record = self.history_manager.get_best_record()
-        best_wpm = best_record.get("wpm", 0.0) if best_record else 0.0
-
-        # Update stats display
-        game_view = self.query_one(GameView)
-        game_view.update_game_stats(stats, best_wpm)
+        best_performance = self.router.stats_service.get_best_performance()
+        best_wpm = best_performance.wpm if best_performance else 0.0
+        self.query_one(GameView).update_game_stats(stats, best_wpm)
 
     def _finish_current_game(self) -> None:
-        """Finish the current game and show results, with correct new record management."""
-        results = self.menu_system.finish_current_game()
-        if results:
-            # After saving to history, check if this run is a new record
-            history = self.history_manager.get_history()
-            if history:
-                previous_best = max((r["wpm"] for r in history[:-1]), default=None)
-                is_new_record = results.get("wpm", 0) > (previous_best or 0)
-            else:
-                previous_best = None
-                is_new_record = True
+        """Finish the current game and show results."""
+        game_result = self.router.finish_game()
+        if not game_result:
+            return
 
-            results["is_new_record"] = is_new_record
-            results["previous_best"] = previous_best
-            self._show_results_view(results)
+        self.last_game_result = game_result
 
-    def _restart_current_game(self) -> None:
-        """Restart the current game with same settings."""
-        # Cancel current game if in progress
-        if self.menu_system.is_in_game():
-            current_game = self.menu_system.get_current_game()
-            if current_game:
-                current_game.cancel()
-        # Restore the menu to main state and select the last started game
-        if self.last_started_game_index is not None:
-            self.menu_system.return_to_main_menu()
-            self.menu_system.select_game_by_index(self.last_started_game_index)
-            self._start_selected_game()
-        else:
-            # Fallback to main menu if we don't know which game to restart
-            self._show_main_menu()
+        # Prepare results dict with record comparison
+        results = game_result.to_dict()
+        results["is_new_record"] = game_result.is_new_record
+        results["previous_best"] = game_result.previous_best
+
+        self._show_results_view(results)
+
+    def _restart_current_game(self, keep_same_text: bool = False) -> None:
+        """Restart the current game.
+        
+        Args:
+            keep_same_text: If True, restart with the same words/phrase. 
+                If False, generate new content.
+        """
+        # Save current target words if required
+        saved_target_words = None
+        if keep_same_text:
+            if self.router.game_controller and self.router.game_controller.current_game:
+                saved_target_words = (
+                    self.router.game_controller.current_game.target_words.copy()
+                )
+
+        # Cancel and restart game
+        if self.router.is_game_active():
+            self.router.cancel_game()
+
+        self.router.return_to_main_menu()
+        self.router.select_game(self.last_selected_game_index)
+
+        if self.router.start_game():
+            # Restore saved words if we saved them
+            if saved_target_words and self.router.game_controller.current_game:
+                self.router.game_controller.current_game.target_words = (
+                    saved_target_words
+                )
+                self.router.game_controller.game_state = GameState.create_ready(
+                    target_words=saved_target_words
+                )
+
+            self._show_game_view()
+            self._update_game_display()
+            self.set_interval(0.3, self._update_game_stats)
 
     def _show_stats(self) -> None:
         """Show the statistics view with typing test records."""
         self.current_view = "stats"
 
-        # Show stats view, hide others
+        # Toggle view visibility
         self.query_one(MainMenuView).display = False
         self.query_one(GameView).display = False
         self.query_one(ResultsView).display = False
         self.query_one(StatsView).display = True
 
-        # Get all records and update stats view
-        all_records = self.history_manager.get_history()
-        stats_view = self.query_one(StatsView)
-        stats_view.update_records(all_records)
+        # Update stats and input
+        all_results = self.router.get_all_games()
+        self.query_one(StatsView).update_records([r.to_dict() for r in all_results])
 
-        # Update input placeholder
         input_field = self.query_one(Input)
         input_field.placeholder = "Press ESC to return to main menu, Ctrl+Q to quit"
         input_field.value = ""
 
     def action_main_menu(self) -> None:
         """Return to main menu."""
-        if self.menu_system.is_in_game():
-            current_game = self.menu_system.get_current_game()
-            if current_game:
-                current_game.cancel()
+        if self.router.is_game_active():
+            self.router.cancel_game()
 
-        self.menu_system.return_to_main_menu()
         self._show_main_menu()
 
     def action_escape_action(self) -> None:
         """Handle escape key - context dependent."""
         if self.current_view == "game":
-            current_game = self.menu_system.get_current_game()
-            if current_game and current_game.status == GameStatus.ACTIVE:
-                # Cancel current game and return to menu only if game has started
-                self._restart_current_game()
+            # Restart if game started, otherwise return to menu
+            if (
+                self.router.game_controller
+                and self.router.game_controller.game_state
+                and self.router.game_controller.game_state.is_active
+            ):
+                self._restart_current_game(keep_same_text=True)
             else:
-                # Return to main menu
                 self.action_main_menu()
-        elif self.current_view == "results":
-            # Return to main menu
+        else:
+            # Return to menu from results/stats views
             self._show_main_menu()
-        elif self.current_view == "stats":
-            # Return to main menu
-            self._show_main_menu()
-
 
 def run_new_app(theme: str = "default") -> None:
     """Run the new modular TermTypr application.

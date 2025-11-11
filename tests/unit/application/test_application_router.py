@@ -5,8 +5,8 @@ from datetime import datetime
 import pytest
 
 from src.application.router.application_router import (
-    AppScreen,
     ApplicationRouter,
+    AppScreen,
     GameDefinition,
 )
 from src.domain.models.game_result import GameResult
