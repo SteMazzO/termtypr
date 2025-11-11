@@ -68,7 +68,7 @@ def stats():
     if best_record:
         typer.echo(
             f"Best performance: {best_record.wpm:.2f} WPM with "
-            f"{best_record.accuracy:.2f}% accuracy on {best_record.timestamp.split('T')[0]}"
+            f"{best_record.accuracy:.2f}% accuracy on {best_record.timestamp.strftime('%Y-%m-%d')}"
         )
 
     # Calculate average stats
