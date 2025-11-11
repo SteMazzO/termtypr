@@ -1,33 +1,20 @@
 # Contributing to TermTypr
 
-First off, thanks for taking the time to contribute! ❤️
+First off, thanks for taking the time to contribute!
 
-All types of contributions are encouraged and valued. See the [Table of Contents](#table-of-contents) for different ways to help and details about how this project handles them. Please make sure to read the relevant section before making your contribution. It will make it a lot easier for us maintainers and smooth out the experience for all involved. The community looks forward to your contributions. 🎉
+All types of contributions are encouraged and valued. Please make sure to read the relevant section before making your contribution. It will make it a lot easier for us maintainers and smooth out the experience for all involved. The community looks forward to your contributions.
 
 > And if you like the project, but just don't have time to contribute, that's fine. There are other easy ways to support the project and show your appreciation, which we would also be very happy about:
+>
 > - Star the project
 > - Tweet about it
 > - Refer this project in your project's readme
 > - Mention the project at local meetups and tell your friends/colleagues
 
-
-## Table of Contents
-
-- [I Want To Contribute](#i-want-to-contribute)
-- [Getting Started](#getting-started)
-  - [Development Environment](#development-environment)
-  - [Running Tests](#running-tests)
-- [Reporting Bugs](#reporting-bugs)
-- [Suggesting Enhancements](#suggesting-enhancements)
-- [Your First Code Contribution](#your-first-code-contribution)
-- [Improving The Documentation](#improving-the-documentation)
-- [Styleguides](#styleguides)
-- [Commit Messages](#commit-messages)
-- [Join The Project Team](#join-the-project-team)
-
 ## I Want To Contribute
 
-> ### Legal Notice 
+> ### Legal Notice
+>
 > When contributing to this project, you must agree that you have authored 100% of the content, that you have the necessary rights to the content and that the content you contribute may be provided under the project license.
 
 ## Getting Started
@@ -67,7 +54,6 @@ If you find a bug, please open an issue using the bug report template. Include a
 - Actual behavior
 - Environment details (OS, Python version, etc.)
 
-
 ### Suggesting Enhancements
 
 We welcome feature suggestions! Open an issue using the feature request template and provide:
@@ -76,7 +62,6 @@ We welcome feature suggestions! Open an issue using the feature request template
 - Detailed explanation of the proposed feature
 - Any relevant examples or mockups
 - Explanation of why this feature would be useful to most TermTypr users
-
 
 ### Improving The Documentation
 
@@ -88,31 +73,17 @@ Documentation improvements are just as valuable as code changes! Here are some w
 - Fix typos or clarify existing documentation
 
 When updating documentation:
+
 1. Follow the same markdown style as existing documentation
 2. Use clear, concise language that is accessible to non-native English speakers
 3. Include code examples where appropriate
 4. Test any code examples to ensure they work as expected
 
-## Styleguides
-
-### Python Styleguide
-
-All Python code should adhere to:
-- [PEP 8](https://peps.python.org/pep-0008/) - Style Guide for Python Code
-- [PEP 484](https://peps.python.org/pep-0484/) - Type Hints
-
-Additionally:
-- Use ruff for linting and formatting (configured in the project)
-- Write docstrings for all public modules, functions, classes, and methods
-- Use descriptive variable names
-- Keep functions focused on a single responsibility
-- Use type hints for all function parameters and return values
-
 ### Commit Messages
 
 We follow the [Conventional Commits](https://www.conventionalcommits.org/) specification:
 
-```
+```text
 <type>(<scope>): <description>
 
 [optional body]
@@ -121,6 +92,7 @@ We follow the [Conventional Commits](https://www.conventionalcommits.org/) speci
 ```
 
 Types:
+
 - `feat`: A new feature
 - `fix`: A bug fix
 - `docs`: Documentation changes
@@ -131,7 +103,8 @@ Types:
 - `chore`: Changes to the build process or auxiliary tools
 
 Example:
-```
+
+```text
 feat(stats): add WPM calculation algorithm
 
 Implements a new algorithm for calculating words per minute that accounts
