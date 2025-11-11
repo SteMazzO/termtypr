@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Complete architectural overhaul**: Domain, Application, Infrastructure, and Presentation layers
+- **Domain Models**: Immutable `GameResult`, `GameState`, `TypingStats` value objects
+- **Repository Pattern**: Abstract `HistoryRepository` with JSON and in-memory implementations
+- **Application Services**: `GameController`, `StatsService`, `ApplicationRouter`
+- **Enhanced UX**: Same-content restart
+- **Type Safety**: Pydantic settings, full type hints, immutable dataclasses
+
+### Changed
+
+- **UI Layer**: Replaced `MenuSystem` with `ApplicationRouter`, views are pure presentation
+- **Game System**: History management moved from `BaseGame` to `GameController`
+- **CLI**: Updated `stats` command to use new architecture
+- **Settings**: Migrated to Pydantic for validation
+
+### Removed
+
+- **Legacy Code**: `MenuSystem`, legacy `HistoryManager`, `history_adapter.py`
+
+### Testing
+
+- 136 unit tests, 100% passing
+
 ## [0.3.5] - 2025-08-28
 
 ### Changed

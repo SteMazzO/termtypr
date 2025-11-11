@@ -1,6 +1,6 @@
 # TermTypr
 
-Python command-line application designed to practice and improve typing speed directly in the terminal.
+A modern, well-architected Python terminal application for practicing and improving typing speed with real-time feedback and comprehensive statistics.
 
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![PyPI version](https://badge.fury.io/py/termtypr.svg)](https://badge.fury.io/py/termtypr)
@@ -8,42 +8,58 @@ Python command-line application designed to practice and improve typing speed di
 
 ## Features
 
-- Interactive typing tests with real-time words-per-minute (WPM) and accuracy tracking
-- Detailed statistics to monitor progress over time
-- Multiple visual themes (light and dark)
-- Several game modes and typing challenges
+- **Interactive Typing Tests** - Real-time WPM and accuracy tracking
+- **Rich Statistics** - Detailed performance analytics with visual charts
+- **Multiple Themes** - Light and dark visual themes
+- **Game Modes** - Random words and phrase typing challenges
+- **Record Tracking** - Personal best tracking with comparison
+- **Persistent History** - All your typing sessions saved locally
 
-## Installation
+## Quick Start
 
-### Prerequisites
-
-- Python 3.9 or higher
-- pip package manager
-
-### Install from PyPI (Recommended)
+### Installation
 
 ```bash
 pip install termtypr
 ```
 
-To start the application:
+### Run
 
 ```bash
 termtypr
 ```
 
-### Install from Source
+### CLI Commands
+
+```bash
+termtypr start              # Start the typing trainer
+termtypr stats              # View statistics from command line
+termtypr add-words word1    # Add custom words
+termtypr list-words         # List all available words
+```
+
+## Development
+
+### Setup Development Environment
 
 ```bash
 git clone https://github.com/SteMazzO/termtypr.git
 cd termtypr
-pip install -e .
-termtypr
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+pip install -e ".[dev]"
+```
+
+### Run Tests
+
+```bash
+pytest tests/ -v           # Run all tests
+pytest --cov=src tests/    # With coverage
 ```
 
 ## Contributing
 
-Contributions are welcome. Please read the [CONTRIBUTING.md](CONTRIBUTING.md) file for guidelines on how to contribute.
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## License
 
@@ -51,5 +67,10 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 ## Acknowledgments
 
-- Inspired by the typing test CLI tool [MiType](https://github.com/Mithil467/mitype), as well as online platforms like [10FastFingers](https://10fastfingers.com/) and [TypeRacer](https://play.typeracer.com/)
-- Text samples are sourced from [Typeracer Data](http://typeracerdata.com/texts).
+- Inspired by [MiType](https://github.com/Mithil467/mitype), [10FastFingers](https://10fastfingers.com/), and [TypeRacer](https://play.typeracer.com/)
+- Text samples from [Typeracer Data](http://typeracerdata.com/texts)
+- Built with [Textual](https://github.com/Textualize/textual) by Textualize
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for version history and release notes.
