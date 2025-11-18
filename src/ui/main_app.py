@@ -10,9 +10,7 @@ from src.application.router.application_router import ApplicationRouter
 from src.config import THEMES
 from src.domain.models.game_result import GameResult
 from src.domain.models.game_state import GameState
-from src.infrastructure.persistence.json_history_repository import (
-    JsonHistoryRepository,
-)
+from src.infrastructure.persistence.json_history_repository import JsonHistoryRepository
 from src.ui.game_view import GameView
 from src.ui.main_menu_view import MainMenuView
 from src.ui.results_view import ResultsView
@@ -281,9 +279,12 @@ class TermTypr(App):
         """Handle real-time input changes for game."""
         if self.current_view != "game":
             return
-        
+
         # Check if we have a game (don't require it to be active yet)
-        if not self.router.game_controller or not self.router.game_controller.current_game:
+        if (
+            not self.router.game_controller
+            or not self.router.game_controller.current_game
+        ):
             return
 
         input_text = event.input.value
@@ -366,9 +367,9 @@ class TermTypr(App):
 
     def _restart_current_game(self, keep_same_text: bool = False) -> None:
         """Restart the current game.
-        
+
         Args:
-            keep_same_text: If True, restart with the same words/phrase. 
+            keep_same_text: If True, restart with the same words/phrase.
                 If False, generate new content.
         """
         # Save current target words if required
@@ -440,6 +441,7 @@ class TermTypr(App):
         else:
             # Return to menu from results/stats views
             self._show_main_menu()
+
 
 def run_new_app(theme: str = "default") -> None:
     """Run the new modular TermTypr application.

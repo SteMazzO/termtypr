@@ -58,7 +58,9 @@ class StatsService:
         """
         return self.history_repository.get_best()
 
-    def get_recent_results(self, limit: int = 10, sort: str = "desc") -> list[GameResult]:
+    def get_recent_results(
+        self, limit: int = 10, sort: str = "desc"
+    ) -> list[GameResult]:
         """Get recent game results.
 
         Args:
@@ -92,7 +94,11 @@ class StatsService:
         Returns:
             TypingStats with averaged values, or None if no history
         """
-        results = self.get_recent_results(limit, sort="desc") if limit else self.get_all_results(sort="desc")
+        results = (
+            self.get_recent_results(limit, sort="desc")
+            if limit
+            else self.get_all_results(sort="desc")
+        )
 
         if not results:
             return None

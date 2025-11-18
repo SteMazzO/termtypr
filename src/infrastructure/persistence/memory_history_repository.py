@@ -20,12 +20,14 @@ class InMemoryHistoryRepository(HistoryRepository):
 
     def get_all(self, sort: str = "desc") -> list[GameResult]:
         """Get all game results from memory.
-        
+
         Args:
             sort: Sort order - 'desc' for newest first (default), 'asc' for oldest first
         """
         # Sort by timestamp
-        sorted_results = sorted(self._results, key=lambda r: r.timestamp, reverse=(sort == "desc"))
+        sorted_results = sorted(
+            self._results, key=lambda r: r.timestamp, reverse=(sort == "desc")
+        )
         return sorted_results
 
     def get_best(self) -> Optional[GameResult]:
@@ -36,7 +38,7 @@ class InMemoryHistoryRepository(HistoryRepository):
 
     def get_recent(self, limit: int = 10, sort: str = "desc") -> list[GameResult]:
         """Get recent game results.
-        
+
         Args:
             limit: Maximum number of results to return
             sort: Sort order - 'desc' for newest first (default), 'asc' for oldest first

@@ -67,7 +67,7 @@ class JsonHistoryRepository(HistoryRepository):
 
     def get_all(self, sort: str = "desc") -> list[GameResult]:
         """Get all game results from history.
-        
+
         Args:
             sort: Sort order - 'desc' for newest first (default), 'asc' for oldest first
         """
@@ -97,7 +97,7 @@ class JsonHistoryRepository(HistoryRepository):
 
     def get_recent(self, limit: int = 10, sort: str = "desc") -> list[GameResult]:
         """Get recent game results.
-        
+
         Args:
             limit: Maximum number of results to return
             sort: Sort order - 'desc' for newest first (default), 'asc' for oldest first

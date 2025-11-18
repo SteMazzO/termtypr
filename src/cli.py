@@ -4,9 +4,7 @@ import typer
 
 from src.application.services.stats_service import StatsService
 from src.data.word_storage import WordStorage
-from src.infrastructure.persistence.json_history_repository import (
-    JsonHistoryRepository,
-)
+from src.infrastructure.persistence.json_history_repository import JsonHistoryRepository
 from src.ui.main_app import run_new_app
 
 app = typer.Typer(help="Fast typing trainer application")
