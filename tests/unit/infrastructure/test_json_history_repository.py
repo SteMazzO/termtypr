@@ -42,15 +42,16 @@ def test_save_and_get_all(temp_file):
 def test_get_best(temp_file):
     """Test getting best result."""
     repo = JsonHistoryRepository(temp_file)
+    base_time = datetime.now()
 
     # Add multiple results
-    for wpm in [40.0, 60.0, 50.0]:
+    for i, wpm in enumerate([40.0, 60.0, 50.0]):
         result = GameResult(
             wpm=wpm,
             accuracy=95.0,
             duration=60.0,
             game_type="Random Words",
-            timestamp=datetime.now(),
+            timestamp=base_time + timedelta(seconds=i),
         )
         repo.save(result)
 
@@ -62,6 +63,7 @@ def test_get_best(temp_file):
 def test_get_recent(temp_file):
     """Test getting recent results."""
     repo = JsonHistoryRepository(temp_file)
+    base_time = datetime.now()
 
     # Add 15 results
     for i in range(15):
@@ -70,7 +72,7 @@ def test_get_recent(temp_file):
             accuracy=95.0,
             duration=60.0,
             game_type="Random Words",
-            timestamp=datetime.now(),
+            timestamp=base_time + timedelta(seconds=i),
         )
         repo.save(result)
 
