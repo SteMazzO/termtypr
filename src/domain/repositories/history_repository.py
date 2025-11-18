@@ -19,11 +19,14 @@ class HistoryRepository(ABC):
         """
 
     @abstractmethod
-    def get_all(self) -> list["GameResult"]:
+    def get_all(self, sort: str = "desc") -> list["GameResult"]:
         """Get all game results from history.
 
+        Args:
+            sort: Sort order - 'desc' for newest first (default), 'asc' for oldest first
+
         Returns:
-            List of all game results, newest first
+            List of all game results, sorted by timestamp
         """
 
     @abstractmethod
@@ -35,11 +38,12 @@ class HistoryRepository(ABC):
         """
 
     @abstractmethod
-    def get_recent(self, limit: int = 10) -> list["GameResult"]:
+    def get_recent(self, limit: int = 10, sort: str = "desc") -> list["GameResult"]:
         """Get recent game results.
 
         Args:
             limit: Maximum number of results to return
+            sort: Sort order - 'desc' for newest first (default), 'asc' for oldest first
 
         Returns:
             List of recent game results

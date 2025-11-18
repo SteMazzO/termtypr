@@ -65,8 +65,12 @@ class JsonHistoryRepository(HistoryRepository):
         data["history"] = history
         return self._save_data(data)
 
-    def get_all(self) -> list[GameResult]:
-        """Get all game results from history."""
+    def get_all(self, sort: str = "desc") -> list[GameResult]:
+        """Get all game results from history.
+        
+        Args:
+            sort: Sort order - 'desc' for newest first (default), 'asc' for oldest first
+        """
         data = self._load_data()
         history = data.get("history", [])
 
@@ -79,8 +83,8 @@ class JsonHistoryRepository(HistoryRepository):
                 print(f"Error parsing record: {e}")
                 continue
 
-        # Return newest first
-        results.reverse()
+        # Sort by timestamp
+        results.sort(key=lambda r: r.timestamp, reverse=(sort == "desc"))
         return results
 
     def get_best(self) -> Optional[GameResult]:
@@ -91,9 +95,14 @@ class JsonHistoryRepository(HistoryRepository):
 
         return max(results, key=lambda r: r.wpm)
 
-    def get_recent(self, limit: int = 10) -> list[GameResult]:
-        """Get recent game results."""
-        results = self.get_all()
+    def get_recent(self, limit: int = 10, sort: str = "desc") -> list[GameResult]:
+        """Get recent game results.
+        
+        Args:
+            limit: Maximum number of results to return
+            sort: Sort order - 'desc' for newest first (default), 'asc' for oldest first
+        """
+        results = self.get_all(sort=sort)
         return results[:limit]
 
     def clear(self) -> bool:

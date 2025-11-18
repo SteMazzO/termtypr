@@ -35,6 +35,7 @@ class BaseGame(ABC):
         self.end_time = 0.0
         self.error_count = 0
         self.current_input = ""
+        self.previous_input = ""  # Track previous state to detect new errors
 
     @abstractmethod
     def initialize(self, **kwargs) -> bool:
@@ -123,14 +124,13 @@ class BaseGame(ABC):
         # Store the typed word
         self.typed_words[self.current_word_index] = word
 
-        # Check for errors (comparing complete words)
-        target_word = self.target_words[self.current_word_index]
-        if word != target_word:
-            self.error_count += 1
+        # Don't count errors here - they're already tracked in _process_partial_input
+        # during character-by-character typing
 
         # Move to next word
         self.current_word_index += 1
         self.current_input = ""
+        self.previous_input = ""  # Reset for next word
 
         # If all words have been attempted, mark as complete
         if self.current_word_index >= len(self.target_words):
@@ -149,6 +149,15 @@ class BaseGame(ABC):
 
     def _process_partial_input(self, input_text: str) -> dict[str, Any]:
         """Process partial input (character by character)."""
+        # Track errors only when new characters are added (not on backspace)
+        if self.current_word_index < len(self.target_words):
+            target_word = self.target_words[self.current_word_index]
+
+            if len(input_text) > len(self.previous_input):
+                if input_text and not target_word.startswith(input_text):
+                    self.error_count += 1
+
+        self.previous_input = input_text
         self.current_input = input_text
 
         # Ensure we have space in typed_words for current progress
@@ -157,12 +166,6 @@ class BaseGame(ABC):
 
         # Update current word in typed_words (for real-time display)
         self.typed_words[self.current_word_index] = input_text
-
-        # Check for errors in current input
-        if self.current_word_index < len(self.target_words):
-            target_word = self.target_words[self.current_word_index]
-            if input_text and not target_word.startswith(input_text):
-                self.error_count += 1
 
         return {
             "status": "active",
@@ -229,19 +232,20 @@ class BaseGame(ABC):
         previous_best = None
 
         # Create result object
+        completed_typed = self.typed_words[: self.current_word_index]
+        completed_target = self.target_words[: self.current_word_index]
+
         self.result = GameResult(
             wpm=stats["wpm"],
             accuracy=stats["accuracy"],
             duration=elapsed_time,
             game_type=self.name,
             timestamp=datetime.now(),
-            total_characters=sum(
-                len(word) for word in self.target_words[: self.current_word_index]
-            ),
+            total_characters=sum(len(word) for word in completed_target),
             correct_characters=sum(
-                len(word)
-                for word in self.typed_words[: self.current_word_index]
-                if word in self.target_words
+                len(typed)
+                for typed, target in zip(completed_typed, completed_target)
+                if typed == target
             ),
             error_count=self.error_count,
             is_new_record=is_new_record,
@@ -259,6 +263,7 @@ class BaseGame(ABC):
         self.end_time = 0.0
         self.error_count = 0
         self.current_input = ""
+        self.previous_input = ""
         self.status = GameStatus.NOT_STARTED
         self.result = None
 

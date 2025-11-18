@@ -2,7 +2,7 @@
 
 import os
 import tempfile
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pytest
 
@@ -113,6 +113,7 @@ def test_empty_repository(temp_file):
 def test_multiple_saves(temp_file):
     """Test saving multiple results."""
     repo = JsonHistoryRepository(temp_file)
+    base_time = datetime.now()
 
     for i in range(5):
         result = GameResult(
@@ -120,7 +121,7 @@ def test_multiple_saves(temp_file):
             accuracy=95.0,
             duration=60.0,
             game_type="Random Words",
-            timestamp=datetime.now(),
+            timestamp=base_time + timedelta(seconds=i),
         )
         assert repo.save(result)
 

@@ -1,6 +1,6 @@
 """Tests for in-memory history repository."""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pytest
 
@@ -53,6 +53,7 @@ def test_get_best(repo):
 
 def test_get_recent(repo):
     """Test getting recent results."""
+    base_time = datetime.now()
     # Add 15 results
     for i in range(15):
         result = GameResult(
@@ -60,7 +61,7 @@ def test_get_recent(repo):
             accuracy=95.0,
             duration=60.0,
             game_type="Random Words",
-            timestamp=datetime.now(),
+            timestamp=base_time + timedelta(seconds=i),
         )
         repo.save(result)
 

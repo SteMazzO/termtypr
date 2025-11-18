@@ -399,7 +399,7 @@ class TermTypr(App):
         self.query_one(StatsView).display = True
 
         # Update stats and input
-        all_results = self.router.get_all_games()
+        all_results = self.router.get_all_games(sort="asc")
         self.query_one(StatsView).update_records([r.to_dict() for r in all_results])
 
         input_field = self.query_one(Input)

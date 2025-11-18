@@ -58,24 +58,28 @@ class StatsService:
         """
         return self.history_repository.get_best()
 
-    def get_recent_results(self, limit: int = 10) -> list[GameResult]:
+    def get_recent_results(self, limit: int = 10, sort: str = "desc") -> list[GameResult]:
         """Get recent game results.
 
         Args:
             limit: Maximum number of results to return
+            sort: Sort order - 'desc' for newest first (default), 'asc' for oldest first
 
         Returns:
-            List of recent GameResult objects, newest first
+            List of recent GameResult objects
         """
-        return self.history_repository.get_recent(limit)
+        return self.history_repository.get_recent(limit, sort=sort)
 
-    def get_all_results(self) -> list[GameResult]:
+    def get_all_results(self, sort: str = "desc") -> list[GameResult]:
         """Get all game results from history.
 
+        Args:
+            sort: Sort order - 'desc' for newest first (default), 'asc' for oldest first
+
         Returns:
-            List of all GameResult objects, newest first
+            List of all GameResult objects
         """
-        return self.history_repository.get_all()
+        return self.history_repository.get_all(sort=sort)
 
     def calculate_average_stats(
         self, limit: Optional[int] = None
@@ -88,7 +92,7 @@ class StatsService:
         Returns:
             TypingStats with averaged values, or None if no history
         """
-        results = self.get_recent_results(limit) if limit else self.get_all_results()
+        results = self.get_recent_results(limit, sort="desc") if limit else self.get_all_results(sort="desc")
 
         if not results:
             return None

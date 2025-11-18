@@ -343,24 +343,28 @@ class ApplicationRouter:
             "game_type_stats": self.stats_service.get_game_type_stats(),
         }
 
-    def get_recent_games(self, limit: int = 10) -> list[GameResult]:
+    def get_recent_games(self, limit: int = 10, sort: str = "desc") -> list[GameResult]:
         """Get recent game results.
 
         Args:
             limit: Maximum number of results to return
+            sort: Sort order - 'desc' for newest first (default), 'asc' for oldest first
 
         Returns:
             List of recent game results
         """
-        return self.stats_service.get_recent_results(limit)
+        return self.stats_service.get_recent_results(limit, sort=sort)
 
-    def get_all_games(self) -> list[GameResult]:
+    def get_all_games(self, sort: str = "desc") -> list[GameResult]:
         """Get all game results from history.
 
+        Args:
+            sort: Sort order - 'desc' for newest first (default), 'asc' for oldest first
+
         Returns:
-            List of all game results, newest first
+            List of all game results
         """
-        return self.stats_service.get_all_results()
+        return self.stats_service.get_all_results(sort=sort)
 
     def get_formatted_stats_table(self, limit: int = 10) -> list[dict[str, Any]]:
         """Get formatted statistics table data.
