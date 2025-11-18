@@ -22,8 +22,9 @@ RECORDS_FILE = DATA_DIR / "history.json"
 
 # Bundled resource files (stored in package, read-only)
 # These use importlib.resources to work correctly when packaged
-with importlib.resources.path("src.data.resources", "words.json") as p:
-    WORDS_FILE = Path(p)
+WORDS_FILE = Path(
+    importlib.resources.files("src.data.resources").joinpath("words.json")
+)
 
 # For backward compatibility, keep APP_ROOT pointing to src directory
 APP_ROOT = Path(__file__).parent
