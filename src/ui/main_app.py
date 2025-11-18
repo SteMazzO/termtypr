@@ -176,7 +176,7 @@ class TermTypr(App):
         input_field = self.query_one(Input)
         input_field.placeholder = (
             "Type the words shown above... "
-            "(SPACE to submit, ESC to restart, Ctrl+Q to quit)"
+            "(SPACE to submit, → new words, ← retry same, ESC to restart, Ctrl+Q to quit)"
         )
         input_field.value = ""
 
@@ -207,6 +207,8 @@ class TermTypr(App):
             return  # Context-specific key handlers
         if self.current_view == "menu":
             self._handle_menu_keys(event)
+        elif self.current_view == "game":
+            self._handle_game_keys(event)
         elif self.current_view == "results":
             self._handle_results_keys(event)
         elif self.current_view == "stats":
@@ -222,6 +224,15 @@ class TermTypr(App):
             self._update_menu_display()
         elif event.key == "ctrl+s":
             self._show_stats()
+
+    def _handle_game_keys(self, event) -> None:
+        """Handle key presses in game view."""
+        if event.key == "right":
+            # Skip to next game instance (new words/phrase)
+            self._restart_current_game(keep_same_text=False)
+        elif event.key == "left":
+            # Restart with same words/phrase
+            self._restart_current_game(keep_same_text=True)
 
     def _handle_results_keys(self, event) -> None:
         """Handle key presses in results view."""
@@ -268,11 +279,11 @@ class TermTypr(App):
 
     def on_input_changed(self, event: Input.Changed) -> None:
         """Handle real-time input changes for game."""
-        if self.current_view != "game" or not self.router.is_game_active():
+        if self.current_view != "game":
             return
-
-        current_game = self.router.game_controller.current_game
-        if not current_game:
+        
+        # Check if we have a game (don't require it to be active yet)
+        if not self.router.game_controller or not self.router.game_controller.current_game:
             return
 
         input_text = event.input.value
@@ -283,8 +294,9 @@ class TermTypr(App):
             event.input.value = ""
             return
 
-        # Process partial input for real-time feedback
-        current_game.process_input(input_text, is_complete_input=False)
+        # Process partial input for real-time feedback through the controller
+        # This ensures game_state transitions to active on first character
+        self.router.process_game_input(input_text, is_complete=False)
         self._update_game_display()
 
     def _start_selected_game(self) -> None:
