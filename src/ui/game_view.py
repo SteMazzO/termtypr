@@ -111,7 +111,9 @@ class GameWordsView(Static):
         if correct_chars > 0:
             word_text.append(word[:correct_chars], style=self.theme_colors["correct"])
         if correct_chars < len(word):
-            word_text.append(word[correct_chars:], style=self.theme_colors["current_word"])
+            word_text.append(
+                word[correct_chars:], style=self.theme_colors["current_word"]
+            )
         return word_text
 
 

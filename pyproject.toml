@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "termtypr"
-version = "0.3.5"
+version = "0.4.0"
 description = "A Python CLI application for practicing and improving typing speed"
 readme = "README.md"
 authors = [
@@ -20,6 +20,7 @@ classifiers = [
     'Programming Language :: Python :: 3.11',
     'Programming Language :: Python :: 3.12',
     'Programming Language :: Python :: 3.13',
+    'Programming Language :: Python :: 3.14',
     "Operating System :: OS Independent",
     "Environment :: Console",
     "Topic :: Utilities",
@@ -31,6 +32,7 @@ dependencies = [
     "plotext>=5.3.2",
     "typer>=0.9.0",
     "platformdirs>=4.1.0",
+    "pydantic>=2.0.0",
 ]
 requires-python = ">=3.9"
 
@@ -66,7 +68,7 @@ cov = ["test-cov", "cov-report"]
 
 # Ruff configuration
 [tool.ruff]
-target-version = "py39"
+target-version = "py310"
 line-length = 88
 select = [
     'F',      # Pyflakes

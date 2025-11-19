@@ -259,7 +259,9 @@ class StatsView(VerticalScroll):
                             Text(
                                 "Press ESC to return to main menu", style="dim italic"
                             ),
-                            Text("Press Ctrl+Q to quit application", style="dim italic")
+                            Text(
+                                "Press Ctrl+Q to quit application", style="dim italic"
+                            ),
                         )
                     ),
                     title="Statistics",

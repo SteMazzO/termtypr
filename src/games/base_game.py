@@ -2,73 +2,30 @@
 
 import time
 from abc import ABC, abstractmethod
-from enum import Enum
+from datetime import datetime
 from typing import Any, Optional
 
 from src.core.stats_calculator import StatsCalculator
-from src.data.history import HistoryManager
-
-
-class GameStatus(Enum):
-    """Status of a typing game."""
-
-    NOT_STARTED = "not_started"
-    READY = "ready"
-    ACTIVE = "active"
-    PAUSED = "paused"
-    COMPLETED = "completed"
-    CANCELLED = "cancelled"
-
-
-class GameResult:
-    """Result of a completed typing game."""
-
-    def __init__(
-        self,
-        wpm: float,
-        accuracy: float,
-        duration: float,
-        total_characters: int,
-        correct_characters: int,
-        error_count: int,
-        is_new_record: bool = False,
-        previous_best: Optional[float] = None,
-        additional_data: Optional[dict[str, Any]] = None,
-    ):
-        self.wpm = wpm
-        self.accuracy = accuracy
-        self.duration = duration
-        self.total_characters = total_characters
-        self.correct_characters = correct_characters
-        self.error_count = error_count
-        self.is_new_record = is_new_record
-        self.previous_best = previous_best
-        self.additional_data = additional_data or {}
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert result to dictionary format."""
-        return {
-            "wpm": self.wpm,
-            "accuracy": self.accuracy,
-            "duration": self.duration,
-            "total_characters": self.total_characters,
-            "correct_characters": self.correct_characters,
-            "error_count": self.error_count,
-            "is_new_record": self.is_new_record,
-            "previous_best": self.previous_best,
-            **self.additional_data,
-        }
+from src.domain.models.game_result import GameResult
+from src.domain.models.game_state import GameStatus
 
 
 class BaseGame(ABC):
     """Abstract base class for all typing games."""
 
-    def __init__(self, name: str, description: str):
+    def __init__(self, name: str, description: str, save_history: bool = True):
+        """Initialize the base game.
+
+        Args:
+            name: Name of the game
+            description: Description of the game
+            save_history: Whether to save to history (deprecated, kept for compatibility)
+        """
         self.name = name
         self.description = description
         self.status = GameStatus.NOT_STARTED
         self.result: Optional[GameResult] = None
-        self.history_manager = HistoryManager()
+        self.save_history = save_history  # Kept for backward compatibility
 
         # Game state
         self.target_words: list[str] = []
@@ -78,6 +35,7 @@ class BaseGame(ABC):
         self.end_time = 0.0
         self.error_count = 0
         self.current_input = ""
+        self.previous_input = ""  # Track previous state to detect new errors
 
     @abstractmethod
     def initialize(self, **kwargs) -> bool:
@@ -166,14 +124,13 @@ class BaseGame(ABC):
         # Store the typed word
         self.typed_words[self.current_word_index] = word
 
-        # Check for errors (comparing complete words)
-        target_word = self.target_words[self.current_word_index]
-        if word != target_word:
-            self.error_count += 1
+        # Don't count errors here - they're already tracked in _process_partial_input
+        # during character-by-character typing
 
         # Move to next word
         self.current_word_index += 1
         self.current_input = ""
+        self.previous_input = ""  # Reset for next word
 
         # If all words have been attempted, mark as complete
         if self.current_word_index >= len(self.target_words):
@@ -192,6 +149,15 @@ class BaseGame(ABC):
 
     def _process_partial_input(self, input_text: str) -> dict[str, Any]:
         """Process partial input (character by character)."""
+        # Track errors only when new characters are added (not on backspace)
+        if self.current_word_index < len(self.target_words):
+            target_word = self.target_words[self.current_word_index]
+
+            if len(input_text) > len(self.previous_input):
+                if input_text and not target_word.startswith(input_text):
+                    self.error_count += 1
+
+        self.previous_input = input_text
         self.current_input = input_text
 
         # Ensure we have space in typed_words for current progress
@@ -200,12 +166,6 @@ class BaseGame(ABC):
 
         # Update current word in typed_words (for real-time display)
         self.typed_words[self.current_word_index] = input_text
-
-        # Check for errors in current input
-        if self.current_word_index < len(self.target_words):
-            target_word = self.target_words[self.current_word_index]
-            if input_text and not target_word.startswith(input_text):
-                self.error_count += 1
 
         return {
             "status": "active",
@@ -266,42 +226,30 @@ class BaseGame(ABC):
             self.error_count,
         )
 
-        # Check for new record
-        best_record = self.history_manager.get_best_record()
-        is_new_record = (
-            stats["wpm"] > best_record.get("wpm", 0) if best_record else True
-        )
-        previous_best = best_record.get("wpm", 0) if best_record else None
-
-        # Save to history
-        self.history_manager.add_to_history(
-            stats["wpm"], stats["accuracy"], elapsed_time, self.name
-        )
+        # Check for new record - note: this is now handled by GameController
+        # Kept here for backward compatibility with direct game usage
+        is_new_record = False
+        previous_best = None
 
         # Create result object
+        completed_typed = self.typed_words[: self.current_word_index]
+        completed_target = self.target_words[: self.current_word_index]
+
         self.result = GameResult(
             wpm=stats["wpm"],
             accuracy=stats["accuracy"],
             duration=elapsed_time,
-            total_characters=sum(
-                len(word) for word in self.target_words[: self.current_word_index]
-            ),
+            game_type=self.name,
+            timestamp=datetime.now(),
+            total_characters=sum(len(word) for word in completed_target),
             correct_characters=sum(
-                len(word)
-                for word in self.typed_words[: self.current_word_index]
-                if word in self.target_words
+                len(typed)
+                for typed, target in zip(completed_typed, completed_target)
+                if typed == target
             ),
             error_count=self.error_count,
             is_new_record=is_new_record,
             previous_best=previous_best,
-            additional_data={
-                "total_words": len(self.target_words),
-                "completion_percentage": (
-                    (self.current_word_index / len(self.target_words)) * 100
-                    if self.target_words
-                    else 0
-                ),
-            },
         )
 
         return self.result
@@ -315,6 +263,7 @@ class BaseGame(ABC):
         self.end_time = 0.0
         self.error_count = 0
         self.current_input = ""
+        self.previous_input = ""
         self.status = GameStatus.NOT_STARTED
         self.result = None
 

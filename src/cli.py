@@ -2,8 +2,9 @@
 
 import typer
 
-from src.data.history import HistoryManager
+from src.application.services.stats_service import StatsService
 from src.data.word_storage import WordStorage
+from src.infrastructure.persistence.json_history_repository import JsonHistoryRepository
 from src.ui.main_app import run_new_app
 
 app = typer.Typer(help="Fast typing trainer application")
@@ -51,29 +52,29 @@ def add_words(
 @app.command()
 def stats():
     """Show typing test statistics."""
-    hisotry_manager = HistoryManager()
-    history = hisotry_manager.get_history()
-    best_record = hisotry_manager.get_best_record()
+    repository = JsonHistoryRepository()
+    stats_service = StatsService(repository)
 
-    if not history:
+    all_results = repository.get_all()
+    if not all_results:
         typer.echo("No typing test records found.")
         return
 
-    typer.echo(f"Total tests: {len(history)}")
+    typer.echo(f"Total tests: {len(all_results)}")
 
+    best_record = stats_service.get_best_performance()
     if best_record:
         typer.echo(
-            f"Best performance: {best_record['wpm']:.2f} WPM with "
-            f"{best_record['accuracy']:.2f}% accuracy on {best_record['date'].split('T')[0]}"
+            f"Best performance: {best_record.wpm:.2f} WPM with "
+            f"{best_record.accuracy:.2f}% accuracy on {best_record.timestamp.strftime('%Y-%m-%d')}"
         )
 
     # Calculate average stats
-    avg_wpm = sum(record["wpm"] for record in history) / len(history)
-    avg_accuracy = sum(record["accuracy"] for record in history) / len(history)
-
-    typer.echo(
-        f"Average performance: {avg_wpm:.2f} WPM with {avg_accuracy:.2f}% accuracy"
-    )
+    avg_stats = stats_service.calculate_average_stats()
+    if avg_stats:
+        typer.echo(
+            f"Average performance: {avg_stats.wpm:.2f} WPM with {avg_stats.accuracy:.2f}% accuracy"
+        )
 
 
 @app.command()
