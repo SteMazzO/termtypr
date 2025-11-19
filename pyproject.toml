@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "termtypr"
-version = "0.3.5"
+version = "0.4.0"
 description = "A Python CLI application for practicing and improving typing speed"
 readme = "README.md"
 authors = [
@@ -68,7 +68,7 @@ cov = ["test-cov", "cov-report"]
 
 # Ruff configuration
 [tool.ruff]
-target-version = "py39"
+target-version = "py310"
 line-length = 88
 select = [
     'F',      # Pyflakes

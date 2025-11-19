@@ -66,11 +66,14 @@ class GameSettings(BaseModel):
 
 
 class ApplicationSettings(BaseModel):
-    """Main application settings."""
+    """Main application settings.
+    
+    FIXME
+    """
 
     # Application info
     app_name: str = Field(default="TermTypr", description="Application name")
-    version: str = Field(default="0.3.5", description="Application version")
+    version: str = Field(default="0.4.0", description="Application version")
 
     # Theme settings
     default_theme: ThemeName = Field(

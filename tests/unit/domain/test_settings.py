@@ -66,7 +66,7 @@ def test_application_settings_defaults():
     settings = ApplicationSettings()
 
     assert settings.app_name == "TermTypr"
-    assert settings.version == "0.3.5"
+    assert settings.version == "0.4.0"
     assert settings.default_theme == ThemeName.DEFAULT
     assert settings.game.default_word_count == 20
 
