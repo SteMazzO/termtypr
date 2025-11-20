@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "termtypr"
-version = "0.4.0"
+dynamic = ["version"]
 description = "A Python CLI application for practicing and improving typing speed"
 readme = "README.md"
 authors = [
@@ -50,6 +50,9 @@ dev = [
 
 [project.scripts]
 termtypr = "termtypr.main:cli"
+
+[tool.hatch.version]
+path = "termtypr/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["termtypr"]
