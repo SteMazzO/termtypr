@@ -2,10 +2,10 @@
 
 import pytest
 
-from src.application.controllers.game_controller import GameController
-from src.domain.models.game_state import GameStatus
-from src.games.random_words_game import RandomWordsGame
-from src.infrastructure.persistence.memory_history_repository import (
+from termtypr.application.controllers.game_controller import GameController
+from termtypr.domain.models.game_state import GameStatus
+from termtypr.games.random_words_game import RandomWordsGame
+from termtypr.infrastructure.persistence.memory_history_repository import (
     InMemoryHistoryRepository,
 )
 

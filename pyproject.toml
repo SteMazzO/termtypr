@@ -49,10 +49,10 @@ dev = [
 "Bug Tracker" = "https://github.com/SteMazzO/TermTypr/issues"
 
 [project.scripts]
-termtypr = "src.main:cli"
+termtypr = "termtypr.main:cli"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src"]
+packages = ["termtypr"]
 
 [tool.hatch.envs.default]
 dependencies = [
@@ -62,7 +62,7 @@ dependencies = [
 
 [tool.hatch.envs.default.scripts]
 test = "pytest {args:tests}"
-test-cov = "pytest --cov=src {args:tests}"
+test-cov = "pytest --cov=termtypr {args:tests}"
 cov-report = "coverage report"
 cov = ["test-cov", "cov-report"]
 

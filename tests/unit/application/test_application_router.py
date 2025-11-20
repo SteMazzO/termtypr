@@ -4,15 +4,15 @@ from datetime import datetime
 
 import pytest
 
-from src.application.router.application_router import (
+from termtypr.application.router.application_router import (
     ApplicationRouter,
     AppScreen,
     GameDefinition,
 )
-from src.domain.models.game_result import GameResult
-from src.games.phrase_typing_game import PhraseTypingGame
-from src.games.random_words_game import RandomWordsGame
-from src.infrastructure.persistence.memory_history_repository import (
+from termtypr.domain.models.game_result import GameResult
+from termtypr.games.phrase_typing_game import PhraseTypingGame
+from termtypr.games.random_words_game import RandomWordsGame
+from termtypr.infrastructure.persistence.memory_history_repository import (
     InMemoryHistoryRepository,
 )
 

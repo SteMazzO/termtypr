@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.domain.models.typing_stats import TypingStats
+from termtypr.domain.models.typing_stats import TypingStats
 
 
 def test_create_valid_stats():

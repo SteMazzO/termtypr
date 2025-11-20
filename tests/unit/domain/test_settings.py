@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from src.domain.config.settings import (
+from termtypr.domain.config.settings import (
     THEME_CONFIGS,
     ApplicationSettings,
     GameSettings,
