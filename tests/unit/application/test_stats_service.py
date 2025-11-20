@@ -4,10 +4,10 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from src.application.services.stats_service import StatsService
-from src.domain.models.game_result import GameResult
-from src.domain.models.typing_stats import TypingStats
-from src.infrastructure.persistence.memory_history_repository import (
+from termtypr.application.services.stats_service import StatsService
+from termtypr.domain.models.game_result import GameResult
+from termtypr.domain.models.typing_stats import TypingStats
+from termtypr.infrastructure.persistence.memory_history_repository import (
     InMemoryHistoryRepository,
 )
 

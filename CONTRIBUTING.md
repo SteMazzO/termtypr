@@ -41,7 +41,7 @@ pytest
 To run tests with coverage:
 
 ```bash
-pytest --cov=src
+pytest --cov=termtypr
 ```
 
 ### Reporting Bugs

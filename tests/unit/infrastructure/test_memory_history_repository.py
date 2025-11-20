@@ -4,8 +4,8 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from src.domain.models.game_result import GameResult
-from src.infrastructure.persistence.memory_history_repository import (
+from termtypr.domain.models.game_result import GameResult
+from termtypr.infrastructure.persistence.memory_history_repository import (
     InMemoryHistoryRepository,
 )
 

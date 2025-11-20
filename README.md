@@ -54,7 +54,7 @@ pip install -e ".[dev]"
 
 ```bash
 pytest tests/ -v           # Run all tests
-pytest --cov=src tests/    # With coverage
+pytest --cov=termtypr tests/    # With coverage
 ```
 
 ## Contributing

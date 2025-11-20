@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.domain.models.game_state import GameState, GameStatus
+from termtypr.domain.models.game_state import GameState, GameStatus
 
 
 def test_create_initial_state():
