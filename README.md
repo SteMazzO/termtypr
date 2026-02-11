@@ -1,8 +1,8 @@
 # TermTypr
 
-A modern, well-architected Python terminal application for practicing and improving typing speed with real-time feedback and comprehensive statistics.
+A modern Python terminal application for practicing and improving typing speed with real-time feedback and comprehensive statistics.
 
-[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![PyPI version](https://badge.fury.io/py/termtypr.svg)](https://badge.fury.io/py/termtypr)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
