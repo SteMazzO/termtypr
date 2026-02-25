@@ -1,5 +1,6 @@
 """Tests for ApplicationRouter."""
 
+import time
 from datetime import datetime, timezone
 
 import pytest
@@ -309,8 +310,11 @@ class TestGameLifecycle:
         """Test that the first completed game is always a new record."""
         router.select_game(0)
         router.start_game({"word_count": 5})
+
+        # Add delays between word submissions to ensure non-zero duration and WPM
         for word in router.current_game.target_words:
             router.process_game_input(word, is_complete=True)
+            time.sleep(0.1)
 
         result = router.finish_game()
         assert result.is_new_record is True
