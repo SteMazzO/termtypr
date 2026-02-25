@@ -1,7 +1,10 @@
-"""Statistics view component for displaying typing test statistics with plotext charts."""
+"""Statistics view for typing test results with plotext charts."""
 
-from datetime import datetime
-from typing import Any
+from __future__ import annotations
+
+import math
+import statistics
+from typing import TypedDict
 
 import plotext as plt
 from rich.align import Align
@@ -13,246 +16,203 @@ from rich.table import Table
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import VerticalScroll
+from textual.events import Resize
 from textual.widgets import Static
 
-from termtypr.config import THEMES
+from termtypr.domain.models.game_result import GameResult
+
+
+class _GameStats(TypedDict):
+    total_tests: int
+    avg_wpm: float
+    avg_accuracy: float
+    best_wpm: float
+    trend_slope: float
+    trend_window: int
+
+
+class _StatsResult(TypedDict):
+    total_tests: int
+    best_record: GameResult
+    avg_wpm: float
+    avg_accuracy: float
+    total_time: float
+    recent_avg_wpm: float
+    recent_count: int
+    game_stats: dict[str, _GameStats]
 
 
 class PlotextMixin(JupyterMixin):
-    """Mixin class for integrating plotext with rich."""
+    """Adapter that lets a plotext canvas render inside rich layouts."""
 
-    def __init__(self, width: int = 80, height: int = 20, title: str = ""):
+    def __init__(self) -> None:
         self.decoder = AnsiDecoder()
-        self.width = width
-        self.height = height
-        self.title = title
         self.canvas = ""
 
-    def __rich_console__(self, console, options):
+    def __rich_console__(self, console, options):  # noqa
         if self.canvas:
-            self.rich_canvas = Group(*self.decoder.decode(self.canvas))
-            yield self.rich_canvas
+            yield Group(*self.decoder.decode(self.canvas))
+
+
+_CHART_HEIGHT = 15
+_MIN_CHART_WIDTH = 40
+_DEFAULT_CHART_WIDTH = 70
+_MIN_RECENT = 10
+_TREND_WINDOW = 10
 
 
 class StatsView(VerticalScroll):
-    """Widget for displaying typing test statistics with scrolling and charts."""
+    """Scrollable view that shows typing-test statistics and charts."""
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
-        self.records: list[dict[str, Any]] = []
-        self.theme_colors = THEMES.get("default", THEMES["default"])
+        self.records: list[GameResult] = []
+        self._valid_records: list[GameResult] = []
 
-    def update_records(self, records: list[dict[str, Any]]) -> None:
-        """Update the records data and refresh display."""
+    def update_records(self, records: list[GameResult]) -> None:
+        """Replace the records list and refresh the display."""
         self.records = records
-        self._update_content()
-
-    def set_theme(self, theme_name: str) -> None:
-        """Set the theme for the stats view."""
-        self.theme_colors = THEMES.get(theme_name, THEMES["default"])
+        self._valid_records = [r for r in records if r.wpm > 0]
         self._update_content()
 
     def compose(self) -> ComposeResult:
-        """Compose the scrollable stats view."""
+        """Create the static content area for charts and stats."""
         yield Static(id="stats-content")
 
-    def _update_content(self) -> None:
-        """Update the content of the stats display."""
-        content_widget = self.query_one("#stats-content", Static)
-        content_widget.update(self._render_stats())
+    def on_resize(self, event: Resize) -> None:
+        """Re-render charts when the terminal is resized."""
+        if self._valid_records:
+            self._update_content()
 
-    def _create_wpm_trend_chart(
-        self, width: int = 70, height: int = 15
-    ) -> PlotextMixin:
-        """Create a clean WPM trend chart using plotext."""
+    def _update_content(self) -> None:
+        self.query_one("#stats-content", Static).update(self._render_stats())
+
+    def _new_chart(self) -> None:
+        """Reset plotext state for a fresh chart."""
         plt.clf()
         plt.theme("dark")
 
-        if len(self.records) < 2:
-            plt.text("Start typing to see your progress!", 0.5, 0.5)
-            plt.plotsize(width, height)
-            plt.title("WPM Progress Chart")
-            canvas = plt.build()
-            mixin = PlotextMixin(width, height, "WPM Progress")
-            mixin.canvas = canvas
-            return mixin
+    @property
+    def _chart_width(self) -> int:
+        """Responsive chart width based on available container width."""
+        available = self.size.width - 6 if self.size.width > 0 else _DEFAULT_CHART_WIDTH
+        return max(_MIN_CHART_WIDTH, available)
 
-        # Use last 20 tests for clean visualization
-        recent_records = self.records[-20:] if len(self.records) > 20 else self.records
-        x = list(range(1, len(recent_records) + 1))
-        y = [record["wpm"] for record in recent_records]
+    @property
+    def _max_recent(self) -> int:
+        """Number of recent tests to show, scaled with chart width."""
+        return max(_MIN_RECENT, self._chart_width // 3)
 
-        # Simple line chart with points
-        plt.plot(x, y, color="cyan", marker="dot")
-
-        plt.plotsize(width, height)
-        plt.title(f"WPM Progress - Last {len(recent_records)} Tests")
-        plt.xlabel("Test #")
-        plt.ylabel("WPM")
-
-        # Add min/max info
-        min_wpm, max_wpm = min(y), max(y)
-        plt.ylim(max(0, min_wpm - 5), max_wpm + 5)
-
-        canvas = plt.build()
-        mixin = PlotextMixin(width, height, "WPM Progress")
-        mixin.canvas = canvas
+    def _finalize_chart(self) -> PlotextMixin:
+        """Build the current plotext figure and wrap it for rich rendering."""
+        plt.plotsize(self._chart_width, _CHART_HEIGHT)
+        mixin = PlotextMixin()
+        mixin.canvas = plt.build()
         return mixin
 
-    def _create_accuracy_chart(self, width: int = 70, height: int = 15) -> PlotextMixin:
-        """Create a clean accuracy chart using plotext."""
-        plt.clf()
-        plt.theme("dark")
+    def _create_wpm_trend_chart(self) -> PlotextMixin:
+        """Line chart of WPM over recent tests."""
+        self._new_chart()
 
-        if len(self.records) < 2:
-            plt.text("Start typing to track accuracy!", 0.5, 0.5)
-            plt.plotsize(width, height)
-            plt.title("Accuracy Tracking")
-            canvas = plt.build()
-            mixin = PlotextMixin(width, height, "Accuracy Tracking")
-            mixin.canvas = canvas
-            return mixin
+        recent = self._valid_records[-self._max_recent :]
+        x = list(range(1, len(recent) + 1))
+        y = [r.wpm for r in recent]
 
-        recent_records = self.records[-20:] if len(self.records) > 20 else self.records
-        x = list(range(1, len(recent_records) + 1))
-        y = [record["accuracy"] for record in recent_records]
-
-        # Simple line chart for accuracy
-        plt.plot(x, y, color="green", marker="dot")
-
-        plt.plotsize(width, height)
-        avg_acc = sum(y) / len(y)
-        plt.title(f"Accuracy Trend - Average: {avg_acc:.1f}%")
+        plt.plot(x, y, color="cyan", marker="dot")
         plt.xlabel("Test #")
+        plt.ylabel("WPM")
+        plt.xticks(self._integer_ticks(x))
+
+        lo, hi = min(y), max(y)
+        plt.ylim(max(0, lo - 5), hi + 5)
+
+        return self._finalize_chart()
+
+    def _create_accuracy_chart(self) -> PlotextMixin:
+        """Line chart of accuracy over recent tests."""
+        self._new_chart()
+
+        recent = self._valid_records[-self._max_recent :]
+        x = list(range(1, len(recent) + 1))
+        y = [r.accuracy for r in recent]
+
+        plt.plot(x, y, color="green", marker="dot")
+        plt.xlabel("Test #")
+        plt.ylabel("Accuracy %")
+        plt.xticks(self._integer_ticks(x))
+        plt.ylim(max(0, min(y) - 5), 100)
+
+        return self._finalize_chart()
+
+    def _create_wpm_accuracy_chart(self) -> PlotextMixin:
+        """Scatter plot of WPM vs Accuracy across all tests."""
+        self._new_chart()
+
+        x = [r.wpm for r in self._valid_records]
+        y = [r.accuracy for r in self._valid_records]
+
+        plt.scatter(x, y, color="cyan", marker="dot")
+        plt.xlabel("WPM")
         plt.ylabel("Accuracy %")
         plt.ylim(max(0, min(y) - 5), 100)
 
-        canvas = plt.build()
-        mixin = PlotextMixin(width, height, "Accuracy Tracking")
-        mixin.canvas = canvas
-        return mixin
+        return self._finalize_chart()
 
-    def _create_performance_distribution(
-        self, width: int = 70, height: int = 15
-    ) -> PlotextMixin:
-        """Create a clean WPM distribution histogram."""
-        plt.clf()
-        plt.theme("dark")
+    def _create_wpm_distribution_chart(self) -> PlotextMixin:
+        """Histogram of WPM values."""
+        self._new_chart()
 
-        if len(self.records) < 5:
-            plt.text("Complete more tests for distribution!", 0.5, 0.5)
-            plt.plotsize(width, height)
-            plt.title("WPM Distribution")
-            canvas = plt.build()
-            mixin = PlotextMixin(width, height, "WPM Distribution")
-            mixin.canvas = canvas
-            return mixin
+        wpm_values = [r.wpm for r in self._valid_records]
+        n_bins = 8
 
-        wpm_values = [record["wpm"] for record in self.records]
-
-        # Simple histogram
-        plt.hist(wpm_values, bins=8, color="yellow")
-        plt.plotsize(width, height)
-
-        avg_wpm = sum(wpm_values) / len(wpm_values)
-        plt.title(f"WPM Distribution - Average: {avg_wpm:.1f}")
+        plt.hist(wpm_values, bins=n_bins, color="yellow")
         plt.xlabel("WPM Range")
         plt.ylabel("Count")
 
-        canvas = plt.build()
-        mixin = PlotextMixin(width, height, "WPM Distribution")
-        mixin.canvas = canvas
-        return mixin
+        # Clamp x-axis so it never goes below 0
+        lo, hi = min(wpm_values), max(wpm_values)
+        plt.xlim(max(0, lo - 1), hi + 1)
+        bin_width = (hi - lo) / n_bins if hi > lo else 1
+        counts: list[int] = [0] * n_bins
+        for v in wpm_values:
+            idx = min(int((v - lo) / bin_width), n_bins - 1)
+            counts[idx] += 1
+        max_count = max(counts)
+        step = max(1, math.ceil(max_count / 6))
+        plt.yticks(list(range(0, max_count + step + 1, step)))
+
+        return self._finalize_chart()
 
     def _create_game_comparison_chart(
-        self, width: int = 70, height: int = 15
+        self, game_stats: dict[str, _GameStats]
     ) -> PlotextMixin:
-        """Create a simple game comparison bar chart."""
-        plt.clf()
-        plt.theme("dark")
+        """Bar chart comparing average WPM per game mode."""
+        self._new_chart()
 
-        game_stats = self._calculate_game_specific_stats()
-
-        if len(game_stats) < 1:
-            plt.text("No game data available!", 0.5, 0.5)
-            plt.plotsize(width, height)
-            plt.title("Game Comparison")
-            canvas = plt.build()
-            mixin = PlotextMixin(width, height, "Game Comparison")
-            mixin.canvas = canvas
-            return mixin
-
-        # Sort by performance
         sorted_games = sorted(
             game_stats.items(), key=lambda x: x[1]["avg_wpm"], reverse=True
-        )
-        games = [g[0][:8] for g in sorted_games[:5]]  # Top 5 games, short names
-        avg_wpms = [g[1]["avg_wpm"] for g in sorted_games[:5]]
+        )[:5]
+        names = [g[0][:12] for g in sorted_games]
+        avg_wpms = [g[1]["avg_wpm"] for g in sorted_games]
 
-        # Simple bar chart
-        plt.bar(games, avg_wpms, color="magenta")
-        plt.plotsize(width, height)
-        plt.title("Game Mode Performance")
+        plt.bar(names, avg_wpms, color="magenta")
         plt.xlabel("Game")
         plt.ylabel("Avg WPM")
 
-        canvas = plt.build()
-        mixin = PlotextMixin(width, height, "Game Comparison")
-        mixin.canvas = canvas
-        return mixin
+        return self._finalize_chart()
 
-    def _create_recent_sessions_chart(
-        self, width: int = 70, height: int = 15
-    ) -> PlotextMixin:
-        """Create a chart showing recent session performance."""
-        plt.clf()
-        plt.theme("dark")
-
-        if len(self.records) < 5:
-            plt.text("Complete more sessions to see trends!", 0.5, 0.5)
-            plt.plotsize(width, height)
-            plt.title("Recent Sessions")
-            canvas = plt.build()
-            mixin = PlotextMixin(width, height, "Recent Sessions")
-            mixin.canvas = canvas
-            return mixin
-
-        # Get last 10 sessions
-        recent = self.records[-10:]
-        x = list(range(1, len(recent) + 1))
-        wpm_data = [r["wpm"] for r in recent]
-        acc_data = [r["accuracy"] for r in recent]
-
-        # Plot WPM as main line
-        plt.plot(x, wpm_data, color="cyan", marker="dot")
-
-        # Normalize accuracy to WPM scale for dual axis effect
-        max_wpm = max(wpm_data)
-        normalized_acc = [acc * max_wpm / 100 for acc in acc_data]
-        plt.plot(x, normalized_acc, color="green", marker="braille")
-
-        plt.plotsize(width, height)
-        plt.title("Recent Performance (Blue: WPM, Green: Accuracy)")
-        plt.xlabel("Recent Tests")
-        plt.ylabel("Performance")
-
-        canvas = plt.build()
-        mixin = PlotextMixin(width, height, "Recent Sessions")
-        mixin.canvas = canvas
-        return mixin
-
-    def _render_stats(self) -> Group:
-        """Render all statistics as a scrollable group with charts."""
-        if not self.records:
+    def _render_stats(self) -> Group:  # noqa
+        """Build the full statistics display."""
+        if not self._valid_records:
             return Group(
                 Panel(
                     Align.center(
                         Group(
-                            Text("📊 No Statistics Available", style="bold"),
+                            Text("\U0001f4ca No Statistics Available", style="bold"),
                             Text(""),
                             Text("No typing test records found.", style="dim"),
                             Text(
-                                "Complete some typing tests to see your statistics here.",
+                                "Complete some tests to see your statistics here.",
                                 style="dim",
                             ),
                             Text(""),
@@ -265,517 +225,292 @@ class StatsView(VerticalScroll):
                         )
                     ),
                     title="Statistics",
-                    border_style=self.theme_colors["info"],
+                    border_style="yellow",
                     padding=(1, 2),
                 )
             )
 
         stats = self._calculate_stats()
-        best_record = stats["best_record"]
+        sections: list = []
 
-        # Create sections as separate panels for better organization
-        sections = []
+        # ── Summary (overview + best + trend merged) ──
+        summary_parts: list = []
 
-        # Header
-        sections.append(
-            Panel(
-                Text("📊 Typing Test Statistics", style="bold", justify="center"),
-                border_style=self.theme_colors["info"],
+        overview = Table(show_header=False, box=None, padding=(0, 2))
+        overview.add_column("Metric", style="dim")
+        overview.add_column("Value", style="bold")
+        overview.add_column("Metric", style="dim")
+        overview.add_column("Value", style="bold")
+        overview.add_row(
+            "Total tests:",
+            str(stats["total_tests"]),
+            "Total time:",
+            self._format_duration(stats["total_time"]),
+        )
+        overview.add_row(
+            "Average WPM:",
+            f"{stats['avg_wpm']:.1f}",
+            "Avg accuracy:",
+            f"{stats['avg_accuracy']:.1f}%",
+        )
+        summary_parts.append(overview)
+        summary_parts.append(Text(""))
+
+        best: GameResult = stats["best_record"]
+        summary_parts.append(
+            Text(
+                (
+                    f"\U0001f3c6 Best: {best.wpm:.1f} WPM "
+                    f"\u2022 {best.accuracy:.1f}% accuracy"
+                ),
+                style="bold green",
+            )
+        )
+        summary_parts.append(
+            Text(
+                f"   {best.game_type} \u2022 {best.timestamp.strftime('%Y-%m-%d')}",
+                style="dim",
             )
         )
 
-        # Overview section
-        overview_table = Table(show_header=False, box=None, padding=(0, 1))
-        overview_table.add_column("Metric", style="dim")
-        overview_table.add_column("Value", style="bold")
-        overview_table.add_row("Total tests:", str(stats["total_tests"]))
-        overview_table.add_row(
-            "Total time:", self._format_duration(stats["total_time"])
-        )
-        overview_table.add_row("Average WPM:", f"{stats['avg_wpm']:.1f}")
-        overview_table.add_row("Average accuracy:", f"{stats['avg_accuracy']:.1f}%")
-
-        sections.append(
-            Panel(
-                overview_table,
-                title="📈 Overview",
-                border_style=self.theme_colors["info"],
-            )
-        )
-
-        # WPM Trend Chart
-        if len(self.records) >= 2:
-            wpm_chart = self._create_wpm_trend_chart()
-            sections.append(
-                Panel(
-                    wpm_chart,
-                    title="📈 WPM Progress",
-                    border_style=self.theme_colors["info"],
+        if stats["recent_count"] >= 3:
+            trend = self._trend_indicator(stats["recent_avg_wpm"], stats["avg_wpm"])
+            summary_parts.append(Text(""))
+            summary_parts.append(
+                Text(
+                    f"\U0001f525 Recent: {stats['recent_avg_wpm']:.1f} WPM "
+                    f"(last {stats['recent_count']}) {trend}",
+                    style="bold",
                 )
             )
-
-        # Accuracy Chart
-        if len(self.records) >= 2:
-            accuracy_chart = self._create_accuracy_chart()
-            sections.append(
-                Panel(
-                    accuracy_chart,
-                    title="🎯 Accuracy Tracking",
-                    border_style=self.theme_colors["correct"],
-                )
-            )
-
-        # Recent Sessions Chart
-        if len(self.records) >= 5:
-            recent_chart = self._create_recent_sessions_chart()
-            sections.append(
-                Panel(
-                    recent_chart,
-                    title="⚡ Recent Sessions",
-                    border_style=self.theme_colors["info"],
-                )
-            )
-
-        # Performance Distribution
-        if len(self.records) >= 5:
-            distribution_chart = self._create_performance_distribution()
-            sections.append(
-                Panel(
-                    distribution_chart,
-                    title="📊 WPM Distribution",
-                    border_style=self.theme_colors["info"],
-                )
-            )
-
-        # Best performance section
-        best_table = Table(show_header=False, box=None, padding=(0, 1))
-        best_table.add_column("Metric", style="dim")
-        best_table.add_column("Value", style=f"bold {self.theme_colors['correct']}")
-        best_table.add_row("Best WPM:", f"{best_record['wpm']:.1f}")
-        best_table.add_row("Accuracy:", f"{best_record['accuracy']:.1f}%")
-        best_table.add_row("Game:", best_record.get("game", "Unknown"))
-        best_table.add_row("Date:", self._format_date(best_record["date"]))
 
         sections.append(
             Panel(
-                best_table,
-                title="🏆 Best Performance",
-                border_style=self.theme_colors["correct"],
+                Group(*summary_parts),
+                title="\U0001f4ca Summary",
+                border_style="yellow",
+                padding=(1, 2),
             )
         )
 
-        # Game comparison chart
+        n_records = len(self._valid_records)
+        n_recent = min(n_records, self._max_recent)
+
+        if n_records >= 2:
+            sections.append(
+                Panel(
+                    self._create_wpm_trend_chart(),
+                    title=f"\U0001f4c8 WPM Progress \u2014 Last {n_recent} Tests",
+                    border_style="yellow",
+                )
+            )
+            sections.append(
+                Panel(
+                    self._create_accuracy_chart(),
+                    title=f"\U0001f3af Accuracy Trend \u2014 Last {n_recent} Tests",
+                    border_style="green",
+                )
+            )
+
+        if n_records >= 3:
+            sections.append(
+                Panel(
+                    self._create_wpm_accuracy_chart(),
+                    title=(
+                        f"\U0001f4c9 WPM vs Accuracy \u2014"
+                        f" {stats['total_tests']} Tests"
+                        f" (Avg: {stats['avg_accuracy']:.1f}%)"
+                    ),
+                    border_style="cyan",
+                )
+            )
+
+        if n_records >= 5:
+            sections.append(
+                Panel(
+                    self._create_wpm_distribution_chart(),
+                    title=(
+                        f"\U0001f4ca WPM Distribution "
+                        f"\u2014 Average: {stats['avg_wpm']:.1f}"
+                    ),
+                    border_style="yellow",
+                )
+            )
+
         game_stats = stats.get("game_stats", {})
-        if len(game_stats) >= 1:
-            game_chart = self._create_game_comparison_chart()
+
+        if len(game_stats) >= 2:
             sections.append(
                 Panel(
-                    game_chart,
-                    title="🎮 Game Performance",
-                    border_style=self.theme_colors["correct"],
+                    self._create_game_comparison_chart(game_stats),
+                    title="\U0001f3ae Average WPM by Game Mode",
+                    border_style="green",
                 )
             )
 
-        # Game-specific statistics table
         if game_stats:
             game_table = Table(show_header=True, header_style="bold")
-            game_table.add_column("Game", style=f"{self.theme_colors['info']}")
+            game_table.add_column("Game", style="yellow")
             game_table.add_column("Tests", justify="center")
             game_table.add_column("Avg WPM", justify="center")
             game_table.add_column("Best WPM", justify="center")
             game_table.add_column("Accuracy", justify="center")
             game_table.add_column("Trend", justify="center")
 
-            sorted_games = sorted(
-                game_stats.items(), key=lambda x: x[1]["total_tests"], reverse=True
-            )
-
-            for game_name, game_data in sorted_games:
-                if game_data["improvement"] > 0:
-                    trend_icon = "↗"
-                elif game_data["improvement"] < 0:
-                    trend_icon = "↘"
+            for name, data in sorted(
+                game_stats.items(),
+                key=lambda x: x[1]["total_tests"],
+                reverse=True,
+            ):
+                tw = data["trend_window"]
+                if tw < 4:
+                    trend_text = Text("\u2014", style="dim")
                 else:
-                    trend_icon = "→"
-
+                    total_change = data["trend_slope"] * (tw - 1)
+                    # 3% of avg WPM filters out normal variance
+                    threshold = data["avg_wpm"] * 0.03
+                    if total_change > threshold:
+                        trend_text = Text(
+                            f"\u2197 +{total_change:.1f} WPM (last {tw})",
+                            style="green",
+                        )
+                    elif total_change < -threshold:
+                        trend_text = Text(
+                            f"\u2198 {total_change:.1f} WPM (last {tw})",
+                            style="red",
+                        )
+                    else:
+                        trend_text = Text("\u2192 Stable", style="dim")
                 game_table.add_row(
-                    game_name,
-                    str(game_data["total_tests"]),
-                    f"{game_data['avg_wpm']:.1f}",
-                    f"{game_data['best_wpm']:.1f}",
-                    f"{game_data['avg_accuracy']:.1f}%",
-                    trend_icon,
+                    name,
+                    str(data["total_tests"]),
+                    f"{data['avg_wpm']:.1f}",
+                    f"{data['best_wpm']:.1f}",
+                    f"{data['avg_accuracy']:.1f}%",
+                    trend_text,
                 )
 
             sections.append(
                 Panel(
-                    game_table,
-                    title="🎮 Game Statistics",
-                    border_style=self.theme_colors["correct"],
+                    game_table, title="\U0001f3ae Game Statistics", border_style="green"
                 )
             )
 
-        # Recent performance trend
-        if stats["recent_count"] >= 3:
-            trend_indicator = ""
-            trend_style = "dim"
-            if stats["recent_avg_wpm"] > stats["avg_wpm"]:
-                trend_indicator = "↗ Improving!"
-                trend_style = self.theme_colors["correct"]
-            elif stats["recent_avg_wpm"] < stats["avg_wpm"] * 0.95:
-                trend_indicator = "↘ Declining"
-                trend_style = self.theme_colors["incorrect"]
-            else:
-                trend_indicator = "→ Stable"
-
-            trend_content = Group(
-                Text(
-                    f"Recent average: {stats['recent_avg_wpm']:.1f} WPM", style="bold"
-                ),
-                Text(f"Trend: {trend_indicator}", style=trend_style),
-                Text(
-                    f"Based on last {stats['recent_count']} tests", style="dim italic"
-                ),
-            )
-
-            sections.append(
-                Panel(
-                    trend_content,
-                    title="🔥 Recent Trend",
-                    border_style=self.theme_colors["info"],
-                )
-            )
-
-        # Instructions
         sections.append(
-            Panel(
-                Group(
-                    Text("💡 Navigation", style="bold", justify="center"),
-                    Text(""),
-                    Text(
-                        "• Scroll up/down with arrow keys or mouse wheel", style="dim"
-                    ),
-                    Text("• Press ESC to return to main menu", style="dim"),
-                    Text("• Press Ctrl+Q to quit application", style="dim"),
-                ),
-                border_style="dim",
+            Text(
+                "Scroll \u2191\u2193  \u2022  ESC menu  \u2022  Ctrl+Q quit",
+                style="dim italic",
+                justify="center",
             )
         )
 
         return Group(*sections)
 
-    def _calculate_stats(self) -> dict[str, Any]:
-        """Calculate comprehensive statistics from records."""
-        if not self.records:
-            return {}
+    @staticmethod
+    def _trend_indicator(recent_avg: float, overall_avg: float) -> str:
+        """Classify the recent performance trend (symmetric \u00b13% band)."""
+        if overall_avg == 0:
+            return "\u2192 Stable"
+        ratio = recent_avg / overall_avg
+        if ratio > 1.03:
+            return "\u2197 Improving"
+        if ratio < 0.97:
+            return "\u2198 Declining"
+        return "\u2192 Stable"
 
-        # Basic stats
-        total_tests = len(self.records)
-        best_record = max(self.records, key=lambda x: x.get("wpm", 0))
+    @staticmethod
+    def _integer_ticks(values: list[int], max_ticks: int = 10) -> list[int]:
+        """Return a subset of *values* spaced so at most *max_ticks* appear."""
+        if len(values) <= max_ticks:
+            return values
+        step = len(values) // max_ticks + 1
+        ticks = values[::step]
+        if ticks[-1] != values[-1]:
+            ticks.append(values[-1])
+        return ticks
 
-        # Averages
-        avg_wpm = sum(record["wpm"] for record in self.records) / total_tests
-        avg_accuracy = sum(record["accuracy"] for record in self.records) / total_tests
-        avg_duration = sum(record["duration"] for record in self.records) / total_tests
+    def _calculate_stats(self) -> _StatsResult:
+        """Compute aggregate statistics from records."""
+        valid = self._valid_records
+        n_valid = len(valid)
+        best_record = max(valid, key=lambda r: r.wpm)
 
-        # Recent performance (last 5 tests)
-        recent_records = self.records[-5:] if len(self.records) >= 5 else self.records
-        recent_avg_wpm = sum(record["wpm"] for record in recent_records) / len(
-            recent_records
-        )
-        recent_avg_accuracy = sum(
-            record["accuracy"] for record in recent_records
-        ) / len(recent_records)
+        avg_wpm = sum(r.wpm for r in valid) / n_valid
+        avg_accuracy = sum(r.accuracy for r in valid) / n_valid
+        total_time = sum(r.duration for r in self.records)
 
-        # Performance ranges
-        wpm_values = [record["wpm"] for record in self.records]
-        accuracy_values = [record["accuracy"] for record in self.records]
-
-        min_wpm = min(wpm_values)
-        max_wpm = max(wpm_values)
-        min_accuracy = min(accuracy_values)
-        max_accuracy = max(accuracy_values)
-
-        # Total time spent
-        total_time = sum(record["duration"] for record in self.records)
-
-        # Game-specific stats
-        game_stats = self._calculate_game_specific_stats()
+        recent = valid[-5:] if n_valid >= 5 else valid
+        recent_avg_wpm = sum(r.wpm for r in recent) / len(recent)
 
         return {
-            "total_tests": total_tests,
+            "total_tests": len(self.records),
             "best_record": best_record,
             "avg_wpm": avg_wpm,
             "avg_accuracy": avg_accuracy,
-            "avg_duration": avg_duration,
-            "recent_avg_wpm": recent_avg_wpm,
-            "recent_avg_accuracy": recent_avg_accuracy,
-            "min_wpm": min_wpm,
-            "max_wpm": max_wpm,
-            "min_accuracy": min_accuracy,
-            "max_accuracy": max_accuracy,
             "total_time": total_time,
-            "recent_count": len(recent_records),
-            "game_stats": game_stats,
+            "recent_avg_wpm": recent_avg_wpm,
+            "recent_count": len(recent),
+            "game_stats": self._calculate_game_specific_stats(),
         }
 
-    def _calculate_game_specific_stats(self) -> dict[str, Any]:
-        """Calculate statistics broken down by game type."""
-        game_stats = {}
+    def _calculate_game_specific_stats(self) -> dict[str, _GameStats]:
+        """Per-game breakdown of statistics."""
+        groups: dict[str, list[GameResult]] = {}
+        for r in self.records:
+            groups.setdefault(r.game_type, []).append(r)
 
-        # Group records by game type
-        games_data = {}
-        for record in self.records:
-            game_name = record.get("game", "Unknown")
-            if game_name not in games_data:
-                games_data[game_name] = []
-            games_data[game_name].append(record)
+        game_stats: dict[str, _GameStats] = {}
+        for name, results in groups.items():
+            n = len(results)
+            # Exclude scrap games (0 WPM) from averages and trend
+            valid = [r for r in results if r.wpm > 0]
+            n_valid = len(valid)
 
-        # Calculate stats for each game
-        for game_name, records in games_data.items():
-            if not records:
+            if n_valid == 0:
+                game_stats[name] = {
+                    "total_tests": n,
+                    "avg_wpm": 0.0,
+                    "avg_accuracy": 0.0,
+                    "best_wpm": 0.0,
+                    "trend_slope": 0.0,
+                    "trend_window": 0,
+                }
                 continue
 
-            total_tests = len(records)
-            avg_wpm = sum(r["wpm"] for r in records) / total_tests
-            avg_accuracy = sum(r["accuracy"] for r in records) / total_tests
-            best_wpm = max(r["wpm"] for r in records)
-            best_accuracy = max(r["accuracy"] for r in records)
-            total_time = sum(r["duration"] for r in records)
+            avg_wpm = sum(r.wpm for r in valid) / n_valid
+            avg_accuracy = sum(r.accuracy for r in valid) / n_valid
+            best_wpm = max(r.wpm for r in valid)
 
-            # Calculate improvement trend (first half vs second half)
-            if total_tests >= 4:
-                mid_point = total_tests // 2
-                first_half_avg = sum(r["wpm"] for r in records[:mid_point]) / mid_point
-                second_half_avg = sum(r["wpm"] for r in records[mid_point:]) / (
-                    total_tests - mid_point
-                )
-                improvement = second_half_avg - first_half_avg
+            if n_valid >= 4:
+                # Linear regression on last N valid games gives a
+                # responsive, organic trend (slope = WPM change/game).
+                window = valid[-min(n_valid, _TREND_WINDOW) :]
+                x = list(range(len(window)))
+                y = [r.wpm for r in window]
+                trend_slope = statistics.linear_regression(x, y).slope
+                trend_window = len(window)
             else:
-                improvement = 0
+                trend_slope = 0.0
+                trend_window = 0
 
-            game_stats[game_name] = {
-                "total_tests": total_tests,
+            game_stats[name] = {
+                "total_tests": n,
                 "avg_wpm": avg_wpm,
                 "avg_accuracy": avg_accuracy,
                 "best_wpm": best_wpm,
-                "best_accuracy": best_accuracy,
-                "total_time": total_time,
-                "improvement": improvement,
-                "latest_date": max(r["date"] for r in records),
+                "trend_slope": trend_slope,
+                "trend_window": trend_window,
             }
 
         return game_stats
 
-    def _format_duration(self, seconds: float) -> str:
-        """Format duration in a human-readable way."""
+    @staticmethod
+    def _format_duration(seconds: float) -> str:
+        """Format seconds into a human-readable string."""
         if seconds < 60:
-            return f"{seconds:.1f}s"
-
-        if seconds < 3600:
-            minutes = int(seconds // 60)
-            remaining_seconds = seconds % 60
-            return f"{minutes}m {remaining_seconds:.0f}s"
-
-        hours = int(seconds // 3600)
-        remaining_minutes = int((seconds % 3600) // 60)
-        return f"{hours}h {remaining_minutes}m"
-
-    def _format_date(self, date_str: str) -> str:
-        """Format date string for display."""
-        try:
-            dt = datetime.fromisoformat(date_str)
-            return dt.strftime("%Y-%m-%d")
-        except (ValueError, AttributeError):
-            return date_str.split("T")[0] if "T" in date_str else date_str
-
-    def render(self) -> Panel:
-        """Render the statistics display."""
-        if not self.records:
-            return Panel(
-                Align.center(
-                    Group(
-                        Text("No Statistics Available", style="bold"),
-                        Text(""),
-                        Text("No typing test records found.", style="dim"),
-                        Text(
-                            "Complete some typing tests to see your statistics here.",
-                            style="dim",
-                        ),
-                        Text(""),
-                        Text("Press ESC to return to main menu", style="dim italic"),
-                    )
-                ),
-                title="Statistics",
-                border_style=self.theme_colors["info"],
-                padding=(1, 2),
-            )
-
-        stats = self._calculate_stats()
-        best_record = stats["best_record"]
-
-        content_parts = []
-
-        # Title
-        content_parts.append(Text("Typing Test Statistics", style="bold"))
-        content_parts.append(Text(""))
-
-        # Overview section
-        content_parts.extend(
-            [
-                Text("Overview", style=f"bold {self.theme_colors['info']}"),
-                Text(f"Total tests completed: {stats['total_tests']}", style="dim"),
-                Text(
-                    f"Total time practiced: {self._format_duration(stats['total_time'])}",
-                    style="dim",
-                ),
-                Text(""),
-            ]
-        )  # Best performance section
-        best_game = best_record.get("game", "Unknown")
-        content_parts.extend(
-            [
-                Text("Best Performance", style=f"bold {self.theme_colors['correct']}"),
-                Text(
-                    f"Best WPM: {best_record['wpm']:.1f} WPM ({best_game})",
-                    style=self.theme_colors["info"],
-                ),
-                Text(
-                    f"Accuracy: {best_record['accuracy']:.1f}%",
-                    style=self.theme_colors["info"],
-                ),
-                Text(
-                    f"Duration: {self._format_duration(best_record['duration'])}",
-                    style=self.theme_colors["info"],
-                ),
-                Text(f"Date: {self._format_date(best_record['date'])}", style="dim"),
-                Text(""),
-            ]
-        )
-
-        # Average performance section
-        content_parts.extend(
-            [
-                Text("Average Performance", style=f"bold {self.theme_colors['info']}"),
-                Text(f"Average WPM: {stats['avg_wpm']:.1f}", style="dim"),
-                Text(f"Average accuracy: {stats['avg_accuracy']:.1f}%", style="dim"),
-                Text(
-                    f"Average test duration: {self._format_duration(stats['avg_duration'])}",
-                    style="dim",
-                ),
-                Text(""),
-            ]
-        )
-
-        # Recent performance section (if enough tests)
-        if stats["recent_count"] >= 3:
-            trend_indicator = ""
-            if stats["recent_avg_wpm"] > stats["avg_wpm"]:
-                trend_indicator = " ↗ (improving!)"
-                trend_style = self.theme_colors["correct"]
-            elif stats["recent_avg_wpm"] < stats["avg_wpm"] * 0.95:  # 5% threshold
-                trend_indicator = " ↘ (declining)"
-                trend_style = self.theme_colors["incorrect"]
-            else:
-                trend_indicator = " → (stable)"
-                trend_style = "dim"
-
-            content_parts.extend(
-                [
-                    Text(
-                        f"Recent Performance (last {stats['recent_count']} tests)",
-                        style=f"bold {self.theme_colors['info']}",
-                    ),
-                    Text(
-                        f"Recent avg WPM: {stats['recent_avg_wpm']:.1f}{trend_indicator}",
-                        style=trend_style,
-                    ),
-                    Text(
-                        f"Recent avg accuracy: {stats['recent_avg_accuracy']:.1f}%",
-                        style="dim",
-                    ),
-                    Text(""),
-                ]
-            )  # Game-specific statistics section
-        game_stats = stats.get("game_stats", {})
-        if game_stats:
-            content_parts.extend(
-                [
-                    Text(
-                        "Game Statistics", style=f"bold {self.theme_colors['correct']}"
-                    ),
-                    Text(""),
-                ]
-            )
-
-            # Sort games by total tests (most played first)
-            sorted_games = sorted(
-                game_stats.items(), key=lambda x: x[1]["total_tests"], reverse=True
-            )
-
-            for game_name, game_data in sorted_games:
-                # Game name header
-                content_parts.append(
-                    Text(f"• {game_name}", style=f"bold {self.theme_colors['info']}")
-                )
-
-                # Game stats
-                content_parts.extend(
-                    [
-                        Text(
-                            f"  Tests: {game_data['total_tests']} | Avg WPM: {game_data['avg_wpm']:.1f} | Best: {game_data['best_wpm']:.1f}",
-                            style="dim",
-                        ),
-                        Text(
-                            f"  Avg Accuracy: {game_data['avg_accuracy']:.1f}% | Time: {self._format_duration(game_data['total_time'])}",
-                            style="dim",
-                        ),
-                    ]
-                )
-
-                # Show improvement trend if available
-                if game_data["improvement"] != 0:
-                    if game_data["improvement"] > 0:
-                        trend_text = (
-                            f"  Improvement: +{game_data['improvement']:.1f} WPM ↗"
-                        )
-                        trend_style = self.theme_colors["correct"]
-                    else:
-                        trend_text = f"  Trend: {game_data['improvement']:.1f} WPM ↘"
-                        trend_style = self.theme_colors["incorrect"]
-                    content_parts.append(Text(trend_text, style=trend_style))
-
-                content_parts.append(Text(""))
-
-        # Performance range section
-        content_parts.extend(
-            [
-                Text("Performance Range", style=f"bold {self.theme_colors['info']}"),
-                Text(
-                    f"WPM range: {stats['min_wpm']:.1f} - {stats['max_wpm']:.1f}",
-                    style="dim",
-                ),
-                Text(
-                    f"Accuracy range: {stats['min_accuracy']:.1f}% - {stats['max_accuracy']:.1f}%",
-                    style="dim",
-                ),
-                Text(""),
-            ]
-        )
-
-        # Instructions
-        content_parts.extend(
-            [
-                Text("Press ESC to return to main menu", style="dim italic"),
-                Text("Press Ctrl+Q to quit", style="dim italic"),
-            ]
-        )
-
-        content = Group(*content_parts)
-
-        return Panel(
-            Align.center(content),
-            title="Statistics",
-            border_style=self.theme_colors["info"],
-            padding=(1, 2),
-        )
+            return f"{seconds:.0f}s"
+        minutes, secs = divmod(int(seconds), 60)
+        if minutes < 60:
+            return f"{minutes}m {secs}s"
+        hours, minutes = divmod(minutes, 60)
+        return f"{hours}h {minutes}m"

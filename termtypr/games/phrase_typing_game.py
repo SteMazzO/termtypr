@@ -1,21 +1,20 @@
 """Phrase typing game implementation."""
 
-from termtypr.core.phrase_generator import PhraseGenerator
+from termtypr.core.phrase_generator import get_random_phrase
 from termtypr.games.base_game import BaseGame, GameStatus
 
 
 class PhraseTypingGame(BaseGame):
-    """A typing game that presents phrases broken into words for the user to type."""
+    """Typing game where players type complete phrases and quotes."""
 
-    def __init__(self, save_history: bool = True):
+    DISPLAY_NAME = "Phrase Typing"
+    GAME_DESCRIPTION = "Type complete phrases and quotes to improve your typing flow"
+
+    def __init__(self):
         super().__init__(
-            name="Phrase Typing",
-            description="Type complete phrases and quotes to improve your typing flow",
-            save_history=save_history,
+            name=self.DISPLAY_NAME,
+            description=self.GAME_DESCRIPTION,
         )
-
-        # Game configuration
-        self.phrase_generator = PhraseGenerator()
 
     def initialize(self, **kwargs) -> bool:
         """Initialize the game with configuration."""
@@ -27,19 +26,7 @@ class PhraseTypingGame(BaseGame):
         if self.status != GameStatus.READY:
             return False
 
-        try:
-            # Generate target phrase and split into words
-            self.target_words = self.phrase_generator.get_random_phrase().split()
-
-            # Reset game state
-            self.typed_words = []
-            self.current_word_index = 0
-            self.start_time = 0.0
-            self.end_time = 0.0
-            self.error_count = 0
-            self.current_input = ""
-
-            self.status = GameStatus.READY
-            return True
-        except Exception:  # noqa
-            return False
+        self.target_words = get_random_phrase().split()
+        self._reset_state()
+        self.status = GameStatus.READY
+        return True

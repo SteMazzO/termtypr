@@ -1,41 +1,35 @@
 # TermTypr
 
-A modern Python terminal application for practicing and improving typing speed with real-time feedback and comprehensive statistics.
+Practice your typing right in the terminal. Track your speed, see where you improve, and have fun doing it.
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![PyPI version](https://badge.fury.io/py/termtypr.svg)](https://badge.fury.io/py/termtypr)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## Features
+## What it does
 
-- **Interactive Typing Tests** - Real-time WPM and accuracy tracking
-- **Rich Statistics** - Detailed performance analytics with visual charts
-- **Multiple Themes** - Light and dark visual themes
-- **Game Modes** - Random words and phrase typing challenges
-- **Record Tracking** - Personal best tracking with comparison
-- **Persistent History** - All your typing sessions saved locally
+- **Two game modes** — random words or full phrases
+- **Live feedback** — WPM and accuracy update as you type
+- **Stats & charts** — see your history, personal bests, and trends over time
+- **Customizable** — set the word count per game, switch themes, add your own words
+- **Runs anywhere** — works on any terminal with Python 3.10+
 
-## Quick Start
-
-### Installation
+## Install and run
 
 ```bash
 pip install termtypr
-```
-
-### Run
-
-```bash
 termtypr
 ```
 
-### CLI Commands
+That's it. The main menu lets you pick a game mode and start typing.
+
+## CLI commands
 
 ```bash
-termtypr start              # Start the typing trainer
-termtypr stats              # View statistics from command line
-termtypr add-words word1    # Add custom words
-termtypr list-words         # List all available words
+termtypr                        # Launch the app
+termtypr stats                  # Quick stats from the command line
+termtypr add-words word1 word2  # Add your own words to the pool
+termtypr list-words             # See all available words
 ```
 
 ## Development
@@ -46,20 +40,19 @@ termtypr list-words         # List all available words
 git clone https://github.com/SteMazzO/termtypr.git
 cd termtypr
 python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
 ```
 
 ### Run Tests
 
 ```bash
-pytest tests/ -v           # Run all tests
-pytest --cov=termtypr tests/    # With coverage
+pytest tests/ -v
 ```
 
 ## Contributing
 
-Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 

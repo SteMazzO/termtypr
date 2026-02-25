@@ -1,29 +1,35 @@
 """Random words typing game implementation."""
 
-from termtypr.core.word_generator import WordGenerator
+from termtypr.core.word_generator import get_random_words
+from termtypr.domain.models.user_preferences import (
+    DEFAULT_WORD_COUNT,
+    MAX_WORD_COUNT,
+    MIN_WORD_COUNT,
+)
 from termtypr.games.base_game import BaseGame, GameStatus
 
 
 class RandomWordsGame(BaseGame):
-    """A typing game that presents random words for the user to type."""
+    """Typing game where players type randomly selected words."""
 
-    def __init__(self, save_history: bool = True):
+    DISPLAY_NAME = "Random Words"
+    GAME_DESCRIPTION = "Type randomly selected words as fast and accurately as possible"
+
+    def __init__(self):
         super().__init__(
-            name="Random Words",
-            description="Type randomly selected words as fast and accurately as possible",
-            save_history=save_history,
+            name=self.DISPLAY_NAME,
+            description=self.GAME_DESCRIPTION,
         )
 
         # Game configuration
-        self.word_count = 20
-        self.word_generator = WordGenerator()
+        self.word_count = DEFAULT_WORD_COUNT
 
     def initialize(self, **kwargs) -> bool:
         """Initialize the game with configuration."""
-        self.word_count = kwargs.get("word_count", 20)
+        self.word_count = kwargs.get("word_count", DEFAULT_WORD_COUNT)
 
         # Validate word count
-        if self.word_count < 5 or self.word_count > 100:
+        if not MIN_WORD_COUNT <= self.word_count <= MAX_WORD_COUNT:
             return False
 
         self.status = GameStatus.READY
@@ -34,19 +40,7 @@ class RandomWordsGame(BaseGame):
         if self.status != GameStatus.READY:
             return False
 
-        try:
-            # Generate target words
-            self.target_words = self.word_generator.get_random_words(self.word_count)
-
-            # Reset game state
-            self.typed_words = []
-            self.current_word_index = 0
-            self.start_time = 0.0
-            self.end_time = 0.0
-            self.error_count = 0
-            self.current_input = ""
-
-            self.status = GameStatus.READY
-            return True
-        except Exception:  # noqa
-            return False
+        self.target_words = get_random_words(self.word_count)
+        self._reset_state()
+        self.status = GameStatus.READY
+        return True

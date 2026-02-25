@@ -2,30 +2,38 @@
 
 import time
 from abc import ABC, abstractmethod
-from datetime import datetime
-from typing import Any, Optional
+from datetime import datetime, timezone
+from enum import Enum
+from typing import Any
 
-from termtypr.core.stats_calculator import StatsCalculator
+from termtypr.core.stats_calculator import calculate_accuracy, calculate_wpm
 from termtypr.domain.models.game_result import GameResult
-from termtypr.domain.models.game_state import GameStatus
+
+
+class GameStatus(Enum):
+    """Status of a typing game."""
+
+    NOT_STARTED = "not_started"
+    READY = "ready"
+    ACTIVE = "active"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
 
 
 class BaseGame(ABC):
     """Abstract base class for all typing games."""
 
-    def __init__(self, name: str, description: str, save_history: bool = True):
+    def __init__(self, name: str, description: str):
         """Initialize the base game.
 
         Args:
             name: Name of the game
             description: Description of the game
-            save_history: Whether to save to history (deprecated, kept for compatibility)
         """
         self.name = name
         self.description = description
         self.status = GameStatus.NOT_STARTED
-        self.result: Optional[GameResult] = None
-        self.save_history = save_history  # Kept for backward compatibility
+        self.result: GameResult | None = None
 
         # Game state
         self.target_words: list[str] = []
@@ -35,7 +43,7 @@ class BaseGame(ABC):
         self.end_time = 0.0
         self.error_count = 0
         self.current_input = ""
-        self.previous_input = ""  # Track previous state to detect new errors
+        self.previous_input = ""
 
     @abstractmethod
     def initialize(self, **kwargs) -> bool:
@@ -61,21 +69,9 @@ class BaseGame(ABC):
         self.status = GameStatus.CANCELLED
         self.result = None
 
-    def is_active(self) -> bool:
-        """Check if the game is currently active."""
-        return self.status == GameStatus.ACTIVE
-
     def is_finished(self) -> bool:
         """Check if the game is finished (completed or cancelled)."""
         return self.status in [GameStatus.COMPLETED, GameStatus.CANCELLED]
-
-    def get_configuration_schema(self) -> dict[str, Any]:
-        """Get the configuration schema for this game type.
-
-        Returns:
-            Dictionary describing the configuration options for this game
-        """
-        return {}
 
     def get_display_data(self) -> dict[str, Any]:
         """Get data for UI display."""
@@ -111,7 +107,10 @@ class BaseGame(ABC):
         return self._process_partial_input(input_text)
 
     def _process_complete_word(self, word: str) -> dict[str, Any]:
-        """Process a complete word input. Always count every submitted word, correct or not."""
+        """Process a complete word input.
+
+        Always count every submitted word, correct or not
+        """
         if self.current_word_index >= len(self.target_words):
             # Already finished
             self.status = GameStatus.COMPLETED
@@ -121,16 +120,12 @@ class BaseGame(ABC):
         while len(self.typed_words) <= self.current_word_index:
             self.typed_words.append("")
 
-        # Store the typed word
         self.typed_words[self.current_word_index] = word
-
-        # Don't count errors here - they're already tracked in _process_partial_input
-        # during character-by-character typing
 
         # Move to next word
         self.current_word_index += 1
         self.current_input = ""
-        self.previous_input = ""  # Reset for next word
+        self.previous_input = ""
 
         # If all words have been attempted, mark as complete
         if self.current_word_index >= len(self.target_words):
@@ -153,9 +148,12 @@ class BaseGame(ABC):
         if self.current_word_index < len(self.target_words):
             target_word = self.target_words[self.current_word_index]
 
-            if len(input_text) > len(self.previous_input):
-                if input_text and not target_word.startswith(input_text):
-                    self.error_count += 1
+            if (
+                input_text
+                and len(input_text) > len(self.previous_input)
+                and not target_word.startswith(input_text)
+            ):
+                self.error_count += 1
 
         self.previous_input = input_text
         self.current_input = input_text
@@ -164,7 +162,7 @@ class BaseGame(ABC):
         while len(self.typed_words) <= self.current_word_index:
             self.typed_words.append("")
 
-        # Update current word in typed_words (for real-time display)
+        # Update current word in typed_words
         self.typed_words[self.current_word_index] = input_text
 
         return {
@@ -185,17 +183,21 @@ class BaseGame(ABC):
 
         elapsed_time = time.time() - self.start_time
 
-        # Use only completed words for stats calculation
         completed_typed_words = self.typed_words[: self.current_word_index]
         completed_target_words = self.target_words[: self.current_word_index]
 
         if completed_typed_words:
-            stats = StatsCalculator.get_statistics(
-                completed_typed_words,
-                completed_target_words,
-                elapsed_time,
-                self.error_count,
+            wpm = calculate_wpm(
+                completed_typed_words, completed_target_words, elapsed_time
             )
+            accuracy = calculate_accuracy(
+                completed_typed_words, completed_target_words, self.error_count
+            )
+            stats = {
+                "wpm": wpm,
+                "accuracy": accuracy,
+                "duration": round(elapsed_time, 2),
+            }
         else:
             stats = {"wpm": 0.0, "accuracy": 100.0, "duration": elapsed_time}
 
@@ -212,51 +214,40 @@ class BaseGame(ABC):
     def finish(self) -> GameResult:
         """Finish the game and return results."""
         if self.status != GameStatus.COMPLETED:
-            # Force finish if not already completed
             self.status = GameStatus.COMPLETED
 
         self.end_time = time.time()
         elapsed_time = self.end_time - self.start_time if self.start_time > 0 else 0.0
 
-        # Calculate final statistics
-        stats = StatsCalculator.get_statistics(
-            self.typed_words[: self.current_word_index],
-            self.target_words[: self.current_word_index],
-            elapsed_time,
-            self.error_count,
-        )
-
-        # Check for new record - note: this is now handled by GameController
-        # Kept here for backward compatibility with direct game usage
-        is_new_record = False
-        previous_best = None
-
-        # Create result object
         completed_typed = self.typed_words[: self.current_word_index]
         completed_target = self.target_words[: self.current_word_index]
 
+        wpm = calculate_wpm(completed_typed, completed_target, elapsed_time)
+        accuracy = calculate_accuracy(
+            completed_typed, completed_target, self.error_count
+        )
+
         self.result = GameResult(
-            wpm=stats["wpm"],
-            accuracy=stats["accuracy"],
+            wpm=wpm,
+            accuracy=accuracy,
             duration=elapsed_time,
             game_type=self.name,
-            timestamp=datetime.now(),
-            total_characters=sum(len(word) for word in completed_target),
+            timestamp=datetime.now(tz=timezone.utc),
+            total_characters=sum(len(w) for w in completed_target),
             correct_characters=sum(
                 len(typed)
-                for typed, target in zip(completed_typed, completed_target)
+                for typed, target in zip(
+                    completed_typed, completed_target, strict=False
+                )
                 if typed == target
             ),
             error_count=self.error_count,
-            is_new_record=is_new_record,
-            previous_best=previous_best,
         )
 
         return self.result
 
-    def reset(self) -> None:
-        """Reset the game to initial state."""
-        self.target_words = []
+    def _reset_state(self) -> None:
+        """Reset mutable game state (called by subclass start())."""
         self.typed_words = []
         self.current_word_index = 0
         self.start_time = 0.0
@@ -264,15 +255,4 @@ class BaseGame(ABC):
         self.error_count = 0
         self.current_input = ""
         self.previous_input = ""
-        self.status = GameStatus.NOT_STARTED
         self.result = None
-
-    def get_elapsed_time(self) -> float:
-        """Get elapsed time since game started."""
-        if not self.start_time:
-            return 0.0
-
-        if self.end_time > 0.0:
-            return self.end_time - self.start_time
-
-        return time.time() - self.start_time

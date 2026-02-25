@@ -10,8 +10,6 @@ from textual.app import ComposeResult
 from textual.containers import Container, Horizontal
 from textual.widgets import Static
 
-from termtypr.config import THEMES
-
 
 class GameWordsView(Static):
     """Widget for displaying typing words during a game."""
@@ -22,7 +20,6 @@ class GameWordsView(Static):
         self.typed_words: list[str] = []
         self.current_idx = 0
         self.current_input = ""
-        self.theme_colors = THEMES.get("default", THEMES["default"])
 
     def update_display_data(self, display_data: dict[str, Any]) -> None:
         """Update the display data from game."""
@@ -37,18 +34,13 @@ class GameWordsView(Static):
         if self.parent:
             self.parent.refresh(layout=True)
 
-    def set_theme(self, theme_name: str) -> None:
-        """Set the theme for the words view."""
-        self.theme_colors = THEMES.get(theme_name, THEMES["default"])
-        self.refresh()
-
     def render(self) -> Panel:
         """Render the words display, responsive to panel width."""
         if not self.words:
             return Panel(
                 Align.center(Text("Loading game...", style="italic")),
                 title="Words",
-                border_style=self.theme_colors["info"],
+                border_style="yellow",
             )
 
         text = Text()
@@ -60,7 +52,7 @@ class GameWordsView(Static):
         return Panel(
             text,
             title="Words to Type",
-            border_style=self.theme_colors["info"],
+            border_style="yellow",
             padding=(1, 2),
         )
 
@@ -69,11 +61,7 @@ class GameWordsView(Static):
         if i < self.current_idx:
             # Completed word
             typed_word = self.typed_words[i] if i < len(self.typed_words) else ""
-            style = (
-                self.theme_colors["correct"]
-                if typed_word == word
-                else self.theme_colors["incorrect"]
-            )
+            style = "green" if typed_word == word else "red"
             return Text(word, style=style)
 
         if i == self.current_idx:
@@ -92,7 +80,7 @@ class GameWordsView(Static):
         )
 
         if not current_typed:
-            return Text(word, style=self.theme_colors["current_word"])
+            return Text(word, style="cyan")
 
         # Find correct characters
         correct_chars = 0
@@ -104,16 +92,14 @@ class GameWordsView(Static):
 
         # If a wrong character was typed, show the whole word as incorrect
         if correct_chars < len(current_typed):
-            return Text(word, style=self.theme_colors["incorrect"])
+            return Text(word, style="red")
 
         # Otherwise, show correct part and the rest as current_word
         word_text = Text()
         if correct_chars > 0:
-            word_text.append(word[:correct_chars], style=self.theme_colors["correct"])
+            word_text.append(word[:correct_chars], style="green")
         if correct_chars < len(word):
-            word_text.append(
-                word[correct_chars:], style=self.theme_colors["current_word"]
-            )
+            word_text.append(word[correct_chars:], style="cyan")
         return word_text
 
 
@@ -124,59 +110,49 @@ class GameStatsView(Static):
         super().__init__(**kwargs)
         self.stats: dict[str, Any] = {}
         self.best_wpm: float = 0.0
-        self.theme_colors = THEMES.get("default", THEMES["default"])
 
-    def update_stats(self, stats: dict[str, Any], best_wpm: float = None) -> None:
+    def update_stats(
+        self, stats: dict[str, Any], best_wpm: float | None = None
+    ) -> None:
         """Update the statistics display."""
         self.stats = stats
         if best_wpm is not None:
             self.best_wpm = best_wpm
         self.refresh()
 
-    def set_theme(self, theme_name: str) -> None:
-        """Set the theme for the stats view."""
-        self.theme_colors = THEMES.get(theme_name, THEMES["default"])
-        self.refresh()
-
     def render(self) -> Panel:
         """Render the statistics display."""
-        if not self.stats:
-            content = Group(
-                Text("Statistics", style="bold"),
-                Text(""),
-                Text("WPM: --", style=self.theme_colors["info"]),
-                Text("Accuracy: --", style=self.theme_colors["info"]),
-                Text("Time: --", style=self.theme_colors["info"]),
-                Text(""),
-                (
-                    Text(f"Best: {self.best_wpm:.1f} WPM", style="dim")
-                    if self.best_wpm > 0
-                    else Text("Best: -- WPM", style="dim")
-                ),
-            )
-        else:
-            wpm = self.stats.get("wpm", 0.0)
-            accuracy = self.stats.get("accuracy", 100.0)
-            elapsed_time = self.stats.get("elapsed_time", 0.0)
+        wpm = self.stats.get("wpm", 0.0) if self.stats else 0.0
+        accuracy = self.stats.get("accuracy", 100.0) if self.stats else 0.0
+        elapsed_time = self.stats.get("elapsed_time", 0.0) if self.stats else 0.0
+        has_data = bool(self.stats)
 
-            content = Group(
-                Text("Statistics", style="bold"),
-                Text(""),
-                Text(f"WPM: {wpm:.1f}", style=self.theme_colors["info"]),
-                Text(f"Accuracy: {accuracy:.1f}%", style=self.theme_colors["info"]),
-                Text(f"Time: {elapsed_time:.1f}s", style=self.theme_colors["info"]),
-                Text(""),
-                (
-                    Text(f"Best: {self.best_wpm:.1f} WPM", style="dim")
-                    if self.best_wpm > 0
-                    else Text("Best: -- WPM", style="dim")
-                ),
-            )
+        best_text = (
+            Text(f"Best: {self.best_wpm:.1f} WPM", style="dim")
+            if self.best_wpm > 0
+            else Text("Best: -- WPM", style="dim")
+        )
+
+        content = Group(
+            Text("Statistics", style="bold"),
+            Text(""),
+            Text(f"WPM: {wpm:.1f}" if has_data else "WPM: --", style="yellow"),
+            Text(
+                f"Accuracy: {accuracy:.1f}%" if has_data else "Accuracy: --",
+                style="yellow",
+            ),
+            Text(
+                f"Time: {elapsed_time:.1f}s" if has_data else "Time: --",
+                style="yellow",
+            ),
+            Text(""),
+            best_text,
+        )
 
         return Panel(
             content,
             title="Stats",
-            border_style=self.theme_colors["info"],
+            border_style="yellow",
             padding=(1, 1),
         )
 
@@ -184,32 +160,20 @@ class GameStatsView(Static):
 class GameView(Container):
     """Main container for game display."""
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.theme_name = "default"
-
     def compose(self) -> ComposeResult:
         """Create child widgets for game view."""
         with Horizontal():
             yield GameWordsView(id="game-words-view")
             yield GameStatsView(id="game-stats-view")
 
-    def set_theme(self, theme_name: str) -> None:
-        """Set theme for all child components."""
-        self.theme_name = theme_name
-
-        # Update theme for child components
-        words_view = self.query_one("#game-words-view", GameWordsView)
-        words_view.set_theme(theme_name)
-        stats_view = self.query_one("#game-stats-view", GameStatsView)
-        stats_view.set_theme(theme_name)
-
     def update_game_display(self, display_data: dict[str, Any]) -> None:
         """Update the game display with new data."""
         words_view = self.query_one("#game-words-view", GameWordsView)
         words_view.update_display_data(display_data)
 
-    def update_game_stats(self, stats: dict[str, Any], best_wpm: float = None) -> None:
+    def update_game_stats(
+        self, stats: dict[str, Any], best_wpm: float | None = None
+    ) -> None:
         """Update the game statistics display."""
         stats_view = self.query_one("#game-stats-view", GameStatsView)
         stats_view.update_stats(stats, best_wpm)

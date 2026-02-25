@@ -1,6 +1,6 @@
 """Tests for in-memory history repository."""
 
-from datetime import datetime, timedelta
+from datetime import datetime, timezone
 
 import pytest
 
@@ -23,10 +23,10 @@ def test_save_and_get_all(repo):
         accuracy=95.0,
         duration=60.0,
         game_type="Random Words",
-        timestamp=datetime.now(),
+        timestamp=datetime.now(tz=timezone.utc),
     )
 
-    assert repo.save(result)
+    repo.save(result)
 
     all_results = repo.get_all()
     assert len(all_results) == 1
@@ -42,33 +42,13 @@ def test_get_best(repo):
             accuracy=95.0,
             duration=60.0,
             game_type="Random Words",
-            timestamp=datetime.now(),
+            timestamp=datetime.now(tz=timezone.utc),
         )
         repo.save(result)
 
     best = repo.get_best()
     assert best is not None
     assert best.wpm == 60.0
-
-
-def test_get_recent(repo):
-    """Test getting recent results."""
-    base_time = datetime.now()
-    # Add 15 results
-    for i in range(15):
-        result = GameResult(
-            wpm=float(i),
-            accuracy=95.0,
-            duration=60.0,
-            game_type="Random Words",
-            timestamp=base_time + timedelta(seconds=i),
-        )
-        repo.save(result)
-
-    recent = repo.get_recent(limit=10)
-    assert len(recent) == 10
-    # Should be newest first
-    assert recent[0].wpm == 14.0
 
 
 def test_clear(repo):
@@ -79,12 +59,12 @@ def test_clear(repo):
         accuracy=95.0,
         duration=60.0,
         game_type="Random Words",
-        timestamp=datetime.now(),
+        timestamp=datetime.now(tz=timezone.utc),
     )
     repo.save(result)
 
     # Clear
-    assert repo.clear()
+    repo.clear()
 
     # Should be empty
     assert len(repo.get_all()) == 0
@@ -94,4 +74,3 @@ def test_empty_repository(repo):
     """Test behavior with empty repository."""
     assert len(repo.get_all()) == 0
     assert repo.get_best() is None
-    assert len(repo.get_recent()) == 0

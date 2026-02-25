@@ -1,38 +1,31 @@
-"""Module for generating words for typing tests"""
+"""Module for generating words for typing tests."""
 
 import random
 
 from termtypr.data.word_storage import WordStorage
 
 
-class WordGenerator:
-    """Class responsible for generating word sequences for typing tests."""
+def get_random_words(
+    count: int = 20, word_storage: WordStorage | None = None
+) -> list[str]:
+    """Get a random selection of words.
 
-    def __init__(self, word_storage: WordStorage = None):
-        """Initialize the WordGenerator.
+    Args:
+        count: Number of words to generate.
+        word_storage: WordStorage instance. Defaults to a new instance.
 
-        Args:
-            word_storage: WordStorage instance.
-        """
-        self.word_storage = word_storage or WordStorage()
+    Returns:
+        List of random words.
+    """
+    storage = word_storage or WordStorage()
+    available_words = storage.get_words()
 
-    def get_random_words(self, count: int = 20) -> list[str]:
-        """Get a random selection of words.
+    if not available_words:
+        return []
 
-        Args:
-            count: Number of words to generate.
+    # If we have fewer words than requested, repeat some words
+    if len(available_words) < count:
+        return random.choices(available_words, k=count)
 
-        Returns:
-            List of random words.
-        """
-        available_words = self.word_storage.get_words()
-
-        if not available_words:
-            return []
-
-        # If we have fewer words than requested, repeat some words
-        if len(available_words) < count:
-            return random.choices(available_words, k=count)
-
-        # Otherwise, select random words without replacement
-        return random.sample(available_words, count)
+    # Otherwise, select random words without replacement
+    return random.sample(available_words, count)
