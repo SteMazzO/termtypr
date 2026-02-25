@@ -1,10 +1,11 @@
 # TermTypr
 
-Practice your typing right in the terminal. Track your speed, see where you improve, and have fun doing it.
+[![License: MIT](https://img.shields.io/github/license/SteMazzO/termtypr?logo=Open+Source+Initiative)](https://opensource.org/license/mit)
+[![PyPI version](https://img.shields.io/pypi/v/termtypr?logo=pypi)](https://pypi.org/project/termtypr/)
+[![PyPI Python](https://img.shields.io/pypi/pyversions/termtypr?logo=pypi)](https://pypi.org/project/termtypr/)
+[![codecov](https://codecov.io/github/SteMazzO/termtypr/coverage.svg?branch=main)](https://codecov.io/github/SteMazzO/termtypr?branch=main)
 
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![PyPI version](https://badge.fury.io/py/termtypr.svg)](https://badge.fury.io/py/termtypr)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+Practice your typing right in the terminal. Track your speed, see where you improve, and have fun doing it.
 
 ## What it does
 
