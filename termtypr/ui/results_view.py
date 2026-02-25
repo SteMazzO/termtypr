@@ -6,7 +6,7 @@ from rich.panel import Panel
 from rich.text import Text
 from textual.widgets import Static
 
-from termtypr.config import THEMES
+from termtypr.domain.models.game_result import GameResult
 
 
 class ResultsView(Static):
@@ -14,43 +14,35 @@ class ResultsView(Static):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.results: dict[str, any] = {}
-        self.theme_colors = THEMES.get("default", THEMES["default"])
+        self.result: GameResult | None = None
 
-    def update_results(self, results: dict[str, any]) -> None:
+    def update_results(self, result: GameResult) -> None:
         """Update the results data and refresh display."""
-        self.results = results
-        self.refresh()
-
-    def set_theme(self, theme_name: str) -> None:
-        """Set the theme for the results view."""
-        self.theme_colors = THEMES.get(theme_name, THEMES["default"])
+        self.result = result
         self.refresh()
 
     def render(self) -> Panel:
         """Render the results display."""
-        if not self.results:
+        if not self.result:
             return Panel(
                 Align.center(Text("No results to display", style="italic")),
                 title="Results",
-                border_style=self.theme_colors["info"],
+                border_style="yellow",
             )
 
         # Extract result data
-        wpm = self.results.get("wpm", 0.0)
-        accuracy = self.results.get("accuracy", 100.0)
-        duration = self.results.get("duration", 0.0)
-        is_new_record = self.results.get("is_new_record", False)
-        previous_best = self.results.get("previous_best", 0.0)
+        wpm = self.result.wpm
+        accuracy = self.result.accuracy
+        duration = self.result.duration
+        is_new_record = self.result.is_new_record
+        previous_best = self.result.previous_best or 0.0
 
         # Create result display
         content_parts = []
 
         # Title
         if is_new_record:
-            content_parts.append(
-                Text("🎉 NEW RECORD! 🎉", style=f"bold {self.theme_colors['correct']}")
-            )
+            content_parts.append(Text("🎉 NEW RECORD! 🎉", style="bold green"))
             content_parts.append(Text(""))
         else:
             content_parts.append(Text("Test Complete!", style="bold"))
@@ -59,18 +51,9 @@ class ResultsView(Static):
         # Main statistics
         content_parts.extend(
             [
-                Text(
-                    f"Words Per Minute: {wpm:.1f} WPM",
-                    style=f"bold {self.theme_colors['info']}",
-                ),
-                Text(
-                    f"Accuracy: {accuracy:.1f}%",
-                    style=f"bold {self.theme_colors['info']}",
-                ),
-                Text(
-                    f"Time: {duration:.1f} seconds",
-                    style=f"bold {self.theme_colors['info']}",
-                ),
+                Text(f"Words Per Minute: {wpm:.1f} WPM", style="bold yellow"),
+                Text(f"Accuracy: {accuracy:.1f}%", style="bold yellow"),
+                Text(f"Time: {duration:.1f} seconds", style="bold yellow"),
                 Text(""),
             ]
         )
@@ -85,7 +68,7 @@ class ResultsView(Static):
                         Text(f"Previous best: {previous_best:.1f} WPM", style="dim"),
                         Text(
                             f"Improvement: +{improvement:.1f} WPM",
-                            style=self.theme_colors["correct"],
+                            style="green",
                         ),
                         Text(""),
                     ]
@@ -98,7 +81,7 @@ class ResultsView(Static):
                         Text(f"Your best: {previous_best:.1f} WPM", style="dim"),
                         Text(
                             f"Difference: -{deficit:.1f} WPM",
-                            style=self.theme_colors["incorrect"],
+                            style="red",
                         ),
                         Text(""),
                     ]
@@ -115,9 +98,7 @@ class ResultsView(Static):
 
         content = Group(*content_parts)
 
-        border_style = (
-            self.theme_colors["correct"] if is_new_record else self.theme_colors["info"]
-        )
+        border_style = "green" if is_new_record else "yellow"
 
         return Panel(
             Align.center(content),

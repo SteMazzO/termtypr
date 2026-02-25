@@ -7,49 +7,47 @@ name = "termtypr"
 dynamic = ["version"]
 description = "A Python CLI application for practicing and improving typing speed"
 readme = "README.md"
-authors = [
-    {name = "Stefano Mazzoleni"}
-]
-license = 'MIT'
-license-files = ['LICENSE']
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Stefano Mazzoleni" }]
+keywords = ["typing", "cli", "practice", "speed", "terminal"]
 classifiers = [
-    'Programming Language :: Python :: 3',
-    'Programming Language :: Python :: 3 :: Only',
-    'Programming Language :: Python :: 3.9',
-    'Programming Language :: Python :: 3.10',
-    'Programming Language :: Python :: 3.11',
-    'Programming Language :: Python :: 3.12',
-    'Programming Language :: Python :: 3.13',
-    'Programming Language :: Python :: 3.14',
+    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
-    "Environment :: Console",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Utilities",
 ]
-keywords = ["typing", "cli", "practice", "speed", "terminal"]
 dependencies = [
-    "rich>=13.5.2",
-    "textual>=0.38.1",
-    "plotext>=5.3.2",
-    "typer>=0.9.0",
-    "platformdirs>=4.1.0",
-    "pydantic>=2.0.0",
+    "rich~=14.3",
+    "textual~=8.0",
+    "plotext~=5.3",
+    "typer~=0.24",
+    "platformdirs~=4.9",
+    "pydantic~=2.12",
 ]
-requires-python = ">=3.9"
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.0.0",
-    "pytest-cov>=4.0.0",
-    "pre-commit>=3.0.0",
-    "ruff>=0.2.0",
+    "pytest>=9.0",
+    "pytest-cov>=7.0",
+    "pre-commit>=4.5",
+    "ruff>=0.15",
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/SteMazzO/TermTypr"
+"Repository" = "https://github.com/SteMazzO/TermTypr"
+"Changelog" = "https://github.com/SteMazzO/TermTypr/blob/main/CHANGELOG.md"
 "Bug Tracker" = "https://github.com/SteMazzO/TermTypr/issues"
 
 [project.scripts]
-termtypr = "termtypr.main:cli"
+termtypr = "termtypr.cli:app"
 
 [tool.hatch.version]
 path = "termtypr/__init__.py"
@@ -58,39 +56,50 @@ path = "termtypr/__init__.py"
 packages = ["termtypr"]
 
 [tool.hatch.envs.default]
-dependencies = [
-  "pytest",
-  "pytest-cov",
-]
+features = ["dev"]
 
-[tool.hatch.envs.default.scripts]
-test = "pytest {args:tests}"
-test-cov = "pytest --cov=termtypr {args:tests}"
-cov-report = "coverage report"
-cov = ["test-cov", "cov-report"]
+[[tool.hatch.envs.hatch-test.matrix]]
+python = ["3.10", "3.11", "3.12", "3.13", "3.14"]
 
-# Ruff configuration
 [tool.ruff]
-target-version = "py310"
 line-length = 88
+
+[tool.ruff.lint]
 select = [
-    'F',      # Pyflakes
-    'E',      # pycodestyle (Error)
-    'I',      # isort
-    'D',      # pydocstyle
-    'UP',     # pyupgrade
-    'YTT',    # flake8-2020
-    'B',      # flake8-bugbear
-    'T10',    # flake8-debugger
-    'T20',    # flake8-print
-    'C4',     # flake8-comprehensions
-    'PYI006', # flake8-pyi
-    'PYI062', # flake8-pyi
-    'PYI063', # flake8-pyi
-    'PYI066', # flake8-pyi
+    "F",      # Pyflakes
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "I",      # isort
+    "D",      # pydocstyle
+    "N",      # pep8-naming
+    "UP",     # pyupgrade
+    "PL",     # pylint
+    "RUF",    # ruff-specific rules
+    "ERA",    # eradicate
+    "PERF",   # perflint
+    "B",      # flake8-bugbear
+    "G",      # flake8-logging-format
+    "Q",      # flake8-quotes
+    "C4",     # flake8-comprehensions
+    "YTT",    # flake8-2020
+    "T20",    # flake8-print
+    "SIM",    # flake8-simplify
+    "PIE",    # flake8-pie
+    "FIX",    # flake8-fixme
+    "ICN",    # flake8-import-conventions
+    "LOG",    # flake8-logging
+    "PYI",    # flake8-pyi
+    "RET",    # flake8-return
 ]
-ignore = ['D105', 'D107', 'D205', 'D415', 'E501', 'B011', 'B028', 'B904']
-pydocstyle = { convention = 'google' }
+
+ignore = [
+    "D107",     # Missing docstring in __init__
+    "PLR2004",  # Magic value comparison
+    "D104",     # Missing docstring in public package
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

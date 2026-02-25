@@ -5,9 +5,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleases]
+## [Unreleased]
 
-## [0.4.0]
+## [0.5.0] - 2026-02-xx
+
+### Added
+
+- **User Preferences**: Persistent word count setting (JSON-based storage)
+- **Command Palette**: Quick access to change word count, view statistics, and take screenshots
+- **Statistics Enhancements**: WPM vs accuracy scatter plot
+
+### Changed
+
+- Simplified internal architecture, removed unnecessary layers and abstractions
+- Flattened folder structure
+- **Statistics accuracy**: Improved precision and formatting of displayed statistics
+- **Statistics UI**: Improved layout and added responsive design
+- **Trend display**: Shows total WPM change over trend window (e.g., `↗ +6.0 WPM (last 10)`)
+- **Improved Performance**: Optimized data handling for a smoother user experience
+- Cleaned up `pyproject.toml` lint rules and added multi-version test matrix (Python 3.10–3.14)
+
+### Fixed
+
+- **Timer leak**: Stats polling timer now reliably stopped on game finish/restart/menu return
+- **New record logic**: 0 WPM games no longer trigger "NEW RECORD!" celebration
+
+### Removed
+
+- Removed unused code and dead modules
+
+### Testing
+
+- 61 unit tests, 100% passing, ruff fully clean on source and tests
+
+## [0.4.1] - 2025-11-20
+
+### Changed
+
+- Rename `src` directory to `termtypr`
+
+## [0.4.0] - 2025-11-19
 
 ### Added
 

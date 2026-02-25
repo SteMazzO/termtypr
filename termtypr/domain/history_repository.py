@@ -1,25 +1,25 @@
 """Abstract repository interface for typing test history."""
 
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import TYPE_CHECKING, Literal
+
+if TYPE_CHECKING:
+    from termtypr.domain.models.game_result import GameResult
 
 
 class HistoryRepository(ABC):
     """Abstract repository for managing typing test history."""
 
     @abstractmethod
-    def save(self, result: "GameResult") -> bool:
+    def save(self, result: "GameResult") -> None:
         """Save a game result to history.
 
         Args:
             result: The game result to save
-
-        Returns:
-            True if successful, False otherwise
         """
 
     @abstractmethod
-    def get_all(self, sort: str = "desc") -> list["GameResult"]:
+    def get_all(self, sort: Literal["asc", "desc"] = "desc") -> list["GameResult"]:
         """Get all game results from history.
 
         Args:
@@ -30,7 +30,7 @@ class HistoryRepository(ABC):
         """
 
     @abstractmethod
-    def get_best(self) -> Optional["GameResult"]:
+    def get_best(self) -> "GameResult | None":
         """Get the best game result based on WPM.
 
         Returns:
@@ -38,21 +38,5 @@ class HistoryRepository(ABC):
         """
 
     @abstractmethod
-    def get_recent(self, limit: int = 10, sort: str = "desc") -> list["GameResult"]:
-        """Get recent game results.
-
-        Args:
-            limit: Maximum number of results to return
-            sort: Sort order - 'desc' for newest first (default), 'asc' for oldest first
-
-        Returns:
-            List of recent game results
-        """
-
-    @abstractmethod
-    def clear(self) -> bool:
-        """Clear all history.
-
-        Returns:
-            True if successful, False otherwise
-        """
+    def clear(self) -> None:
+        """Clear all history."""

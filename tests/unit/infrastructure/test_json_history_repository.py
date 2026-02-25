@@ -2,12 +2,14 @@
 
 import os
 import tempfile
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
 from termtypr.domain.models.game_result import GameResult
-from termtypr.infrastructure.persistence.json_history_repository import JsonHistoryRepository
+from termtypr.infrastructure.persistence.json_history_repository import (
+    JsonHistoryRepository,
+)
 
 
 @pytest.fixture
@@ -29,10 +31,10 @@ def test_save_and_get_all(temp_file):
         accuracy=95.0,
         duration=60.0,
         game_type="Random Words",
-        timestamp=datetime.now(),
+        timestamp=datetime.now(tz=timezone.utc),
     )
 
-    assert repo.save(result)
+    repo.save(result)
 
     all_results = repo.get_all()
     assert len(all_results) == 1
@@ -42,7 +44,7 @@ def test_save_and_get_all(temp_file):
 def test_get_best(temp_file):
     """Test getting best result."""
     repo = JsonHistoryRepository(temp_file)
-    base_time = datetime.now()
+    base_time = datetime.now(tz=timezone.utc)
 
     # Add multiple results
     for i, wpm in enumerate([40.0, 60.0, 50.0]):
@@ -60,28 +62,6 @@ def test_get_best(temp_file):
     assert best.wpm == 60.0
 
 
-def test_get_recent(temp_file):
-    """Test getting recent results."""
-    repo = JsonHistoryRepository(temp_file)
-    base_time = datetime.now()
-
-    # Add 15 results
-    for i in range(15):
-        result = GameResult(
-            wpm=float(i),
-            accuracy=95.0,
-            duration=60.0,
-            game_type="Random Words",
-            timestamp=base_time + timedelta(seconds=i),
-        )
-        repo.save(result)
-
-    recent = repo.get_recent(limit=10)
-    assert len(recent) == 10
-    # Should be newest first
-    assert recent[0].wpm == 14.0
-
-
 def test_clear(temp_file):
     """Test clearing history."""
     repo = JsonHistoryRepository(temp_file)
@@ -92,12 +72,12 @@ def test_clear(temp_file):
         accuracy=95.0,
         duration=60.0,
         game_type="Random Words",
-        timestamp=datetime.now(),
+        timestamp=datetime.now(tz=timezone.utc),
     )
     repo.save(result)
 
     # Clear
-    assert repo.clear()
+    repo.clear()
 
     # Should be empty
     assert len(repo.get_all()) == 0
@@ -109,13 +89,12 @@ def test_empty_repository(temp_file):
 
     assert len(repo.get_all()) == 0
     assert repo.get_best() is None
-    assert len(repo.get_recent()) == 0
 
 
 def test_multiple_saves(temp_file):
     """Test saving multiple results."""
     repo = JsonHistoryRepository(temp_file)
-    base_time = datetime.now()
+    base_time = datetime.now(tz=timezone.utc)
 
     for i in range(5):
         result = GameResult(
@@ -125,7 +104,7 @@ def test_multiple_saves(temp_file):
             game_type="Random Words",
             timestamp=base_time + timedelta(seconds=i),
         )
-        assert repo.save(result)
+        repo.save(result)
 
     all_results = repo.get_all()
     assert len(all_results) == 5

@@ -2,9 +2,10 @@
 
 import typer
 
-from termtypr.application.services.stats_service import StatsService
 from termtypr.data.word_storage import WordStorage
-from termtypr.infrastructure.persistence.json_history_repository import JsonHistoryRepository
+from termtypr.infrastructure.persistence.json_history_repository import (
+    JsonHistoryRepository,
+)
 from termtypr.ui.main_app import run_new_app
 
 app = typer.Typer(help="Fast typing trainer application")
@@ -18,17 +19,13 @@ def main(ctx: typer.Context):
     If no command is provided, starts the main menu with typing games.
     """
     if ctx.invoked_subcommand is None:
-        run_new_app(theme="default")
+        run_new_app()
 
 
 @app.command()
-def start(
-    theme: str = typer.Option(
-        "default", "--theme", "-t", help="Theme to use (default or light)"
-    ),
-):
+def start():
     """Start the typing trainer with main menu."""
-    run_new_app(theme=theme)
+    run_new_app()
 
 
 @app.command()
@@ -53,27 +50,28 @@ def add_words(
 def stats():
     """Show typing test statistics."""
     repository = JsonHistoryRepository()
-    stats_service = StatsService(repository)
-
     all_results = repository.get_all()
+
     if not all_results:
         typer.echo("No typing test records found.")
         return
 
     typer.echo(f"Total tests: {len(all_results)}")
 
-    best_record = stats_service.get_best_performance()
-    if best_record:
+    valid = [r for r in all_results if r.wpm > 0]
+
+    best = max(valid, key=lambda r: r.wpm) if valid else None
+    if best:
         typer.echo(
-            f"Best performance: {best_record.wpm:.2f} WPM with "
-            f"{best_record.accuracy:.2f}% accuracy on {best_record.timestamp.strftime('%Y-%m-%d')}"
+            f"Best performance: {best.wpm:.1f} WPM with "
+            f"{best.accuracy:.1f}% accuracy on {best.timestamp.strftime('%Y-%m-%d')}"
         )
 
-    # Calculate average stats
-    avg_stats = stats_service.calculate_average_stats()
-    if avg_stats:
+    if valid:
+        avg_wpm = sum(r.wpm for r in valid) / len(valid)
+        avg_acc = sum(r.accuracy for r in valid) / len(valid)
         typer.echo(
-            f"Average performance: {avg_stats.wpm:.2f} WPM with {avg_stats.accuracy:.2f}% accuracy"
+            f"Average performance: {avg_wpm:.1f} WPM with {avg_acc:.1f}% accuracy"
         )
 
 
@@ -92,10 +90,5 @@ def list_words():
         typer.echo(f"  {i+1}. {word}")
 
 
-def run():
-    """Entry point for the CLI."""
-    app()
-
-
 if __name__ == "__main__":
-    run()
+    app()
