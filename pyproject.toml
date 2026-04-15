@@ -25,7 +25,7 @@ classifiers = [
     "Topic :: Utilities",
 ]
 dependencies = [
-    "rich~=14.3",
+    "rich~=15.0",
     "textual~=8.0",
     "plotext~=5.3",
     "typer~=0.24",
