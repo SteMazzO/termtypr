@@ -113,6 +113,15 @@ class TestCurrentStats:
         stats = game.get_current_stats()
         assert stats["characters_typed"] == 8  # 'hello' + 'wor'
 
+    def test_in_progress_word_untyped_tail_not_penalized(self, game):
+        """A partially typed word's remaining characters aren't errors."""
+        type_word(game, "h")  # correct first char of 'hello'
+        game.start_time -= 60
+        stats = game.get_current_stats()
+        # 1 correct char in ~60s -> 0.2 WPM; counting the 4 untyped chars
+        # of 'hello' as errors would clamp this to 0
+        assert stats["wpm"] > 0
+
     def test_stats_before_start(self, game):
         """Before any input, stats are zeroed with 100% accuracy."""
         stats = game.get_current_stats()

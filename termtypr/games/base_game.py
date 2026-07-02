@@ -223,9 +223,10 @@ class BaseGame(ABC):
         # between word submissions.
         typed = self.typed_words[: self.current_word_index]
         targets = self.target_words[: self.current_word_index]
-        if self.current_input:
+        if self.current_input and self.current_word_index < len(self.target_words):
+            current_target = self.target_words[self.current_word_index]
             typed = [*typed, self.current_input]
-            targets = self.target_words[: self.current_word_index + 1]
+            targets = [*targets, current_target[: len(self.current_input)]]
 
         return {
             "wpm": calculate_wpm(typed, targets, elapsed_time),
