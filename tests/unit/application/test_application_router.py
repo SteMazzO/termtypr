@@ -311,10 +311,11 @@ class TestGameLifecycle:
         router.select_game(0)
         router.start_game({"word_count": 5})
 
-        # Add delays between word submissions to ensure non-zero duration and WPM
+        # Add delays between word submissions so the total duration exceeds
+        # the minimum elapsed time required for a non-zero WPM
         for word in router.current_game.target_words:
             router.process_game_input(word, is_complete=True)
-            time.sleep(0.1)
+            time.sleep(0.25)
 
         result = router.finish_game()
         assert result.is_new_record is True

@@ -13,6 +13,7 @@ class GameResult:
     duration: float
     game_type: str
     timestamp: datetime
+    raw_wpm: float = 0.0
     total_characters: int = 0
     correct_characters: int = 0
     error_count: int = 0
@@ -23,6 +24,7 @@ class GameResult:
         """Convert to dictionary for serialization."""
         return {
             "wpm": self.wpm,
+            "raw_wpm": self.raw_wpm,
             "accuracy": self.accuracy,
             "duration": self.duration,
             "game_type": self.game_type,
@@ -46,6 +48,7 @@ class GameResult:
             ts = datetime.now(tz=timezone.utc)
         return cls(
             wpm=data.get("wpm", 0.0),
+            raw_wpm=data.get("raw_wpm", 0.0),
             accuracy=data.get("accuracy", 0.0),
             duration=data.get("duration", 0.0),
             game_type=data.get("game_type") or data.get("game", "Unknown"),

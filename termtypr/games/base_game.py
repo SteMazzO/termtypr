@@ -6,7 +6,11 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
-from termtypr.core.stats_calculator import calculate_accuracy, calculate_wpm
+from termtypr.core.stats_calculator import (
+    calculate_accuracy,
+    calculate_raw_wpm,
+    calculate_wpm,
+)
 from termtypr.domain.models.game_result import GameResult
 
 
@@ -42,6 +46,7 @@ class BaseGame(ABC):
         self.start_time = 0.0
         self.end_time = 0.0
         self.error_count = 0
+        self.total_keystrokes = 0
         self.current_input = ""
         self.previous_input = ""
 
@@ -106,15 +111,29 @@ class BaseGame(ABC):
         # Process character-by-character input
         return self._process_partial_input(input_text)
 
-    def _process_complete_word(self, word: str) -> dict[str, Any]:
+    def _process_complete_word(
+        self, word: str, is_keystroke: bool = True
+    ) -> dict[str, Any]:
         """Process a complete word input.
 
-        Always count every submitted word, correct or not
+        Always count every submitted word, correct or not.
+
+        Args:
+            word: The submitted word.
+            is_keystroke: True when the submission came from an actual key
+                press (space/enter), which then counts toward accuracy.
         """
         if self.current_word_index >= len(self.target_words):
             # Already finished
             self.status = GameStatus.COMPLETED
             return {"status": "complete", "message": "All words completed"}
+
+        if is_keystroke:
+            # The submitting space/enter is itself a keystroke: correct when
+            # the word matches its target, an error otherwise.
+            self.total_keystrokes += 1
+            if word != self.target_words[self.current_word_index]:
+                self.error_count += 1
 
         # Ensure typed_words has a slot for every attempted word
         while len(self.typed_words) <= self.current_word_index:
@@ -144,16 +163,21 @@ class BaseGame(ABC):
 
     def _process_partial_input(self, input_text: str) -> dict[str, Any]:
         """Process partial input (character by character)."""
-        # Track errors only when new characters are added (not on backspace)
+        # Track keystrokes only when new characters are added (not on
+        # backspace). Each added character is judged against its own target
+        # position, so one typo doesn't cascade into errors for every
+        # keystroke that follows it.
         if self.current_word_index < len(self.target_words):
             target_word = self.target_words[self.current_word_index]
+            added = len(input_text) - len(self.previous_input)
 
-            if (
-                input_text
-                and len(input_text) > len(self.previous_input)
-                and not target_word.startswith(input_text)
-            ):
-                self.error_count += 1
+            if input_text and added > 0:
+                self.total_keystrokes += added
+                self.error_count += sum(
+                    1
+                    for i in range(len(self.previous_input), len(input_text))
+                    if i >= len(target_word) or input_text[i] != target_word[i]
+                )
 
         self.previous_input = input_text
         self.current_input = input_text
@@ -164,6 +188,15 @@ class BaseGame(ABC):
 
         # Update current word in typed_words
         self.typed_words[self.current_word_index] = input_text
+
+        # The test ends the moment the last word is typed correctly; no
+        # trailing space is needed.
+        if (
+            self.target_words
+            and self.current_word_index == len(self.target_words) - 1
+            and input_text == self.target_words[self.current_word_index]
+        ):
+            return self._process_complete_word(input_text, is_keystroke=False)
 
         return {
             "status": "active",
@@ -176,40 +209,33 @@ class BaseGame(ABC):
         if not self.start_time:
             return {
                 "wpm": 0.0,
+                "raw_wpm": 0.0,
                 "accuracy": 100.0,
+                "duration": 0.0,
                 "elapsed_time": 0.0,
+                "total_words": len(self.target_words),
                 "characters_typed": 0,
             }
 
         elapsed_time = time.time() - self.start_time
 
-        completed_typed_words = self.typed_words[: self.current_word_index]
-        completed_target_words = self.target_words[: self.current_word_index]
+        # Include the word currently being typed so live WPM doesn't sag
+        # between word submissions.
+        typed = self.typed_words[: self.current_word_index]
+        targets = self.target_words[: self.current_word_index]
+        if self.current_input:
+            typed = [*typed, self.current_input]
+            targets = self.target_words[: self.current_word_index + 1]
 
-        if completed_typed_words:
-            wpm = calculate_wpm(
-                completed_typed_words, completed_target_words, elapsed_time
-            )
-            accuracy = calculate_accuracy(
-                completed_typed_words, completed_target_words, self.error_count
-            )
-            stats = {
-                "wpm": wpm,
-                "accuracy": accuracy,
-                "duration": round(elapsed_time, 2),
-            }
-        else:
-            stats = {"wpm": 0.0, "accuracy": 100.0, "duration": elapsed_time}
-
-        stats.update(
-            {
-                "elapsed_time": elapsed_time,
-                "total_words": len(self.target_words),
-                "characters_typed": sum(len(word) for word in completed_typed_words),
-            }
-        )
-
-        return stats
+        return {
+            "wpm": calculate_wpm(typed, targets, elapsed_time),
+            "raw_wpm": calculate_raw_wpm(typed, elapsed_time),
+            "accuracy": calculate_accuracy(self.total_keystrokes, self.error_count),
+            "duration": round(elapsed_time, 2),
+            "elapsed_time": elapsed_time,
+            "total_words": len(self.target_words),
+            "characters_typed": sum(len(word) for word in typed),
+        }
 
     def finish(self) -> GameResult:
         """Finish the game and return results."""
@@ -223,12 +249,12 @@ class BaseGame(ABC):
         completed_target = self.target_words[: self.current_word_index]
 
         wpm = calculate_wpm(completed_typed, completed_target, elapsed_time)
-        accuracy = calculate_accuracy(
-            completed_typed, completed_target, self.error_count
-        )
+        raw_wpm = calculate_raw_wpm(completed_typed, elapsed_time)
+        accuracy = calculate_accuracy(self.total_keystrokes, self.error_count)
 
         self.result = GameResult(
             wpm=wpm,
+            raw_wpm=raw_wpm,
             accuracy=accuracy,
             duration=elapsed_time,
             game_type=self.name,
@@ -253,6 +279,7 @@ class BaseGame(ABC):
         self.start_time = 0.0
         self.end_time = 0.0
         self.error_count = 0
+        self.total_keystrokes = 0
         self.current_input = ""
         self.previous_input = ""
         self.result = None

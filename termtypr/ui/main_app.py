@@ -88,6 +88,7 @@ class WordCountDialog(ModalScreen[int | None]):
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Handle button presses for OK and Cancel."""
+        event.stop()
         if event.button.id == "wc-ok":
             self._submit()
         else:
@@ -95,6 +96,9 @@ class WordCountDialog(ModalScreen[int | None]):
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         """Handle Enter key in the input field to submit."""
+        # Stop the event here so it never reaches the app's handler,
+        # which would treat it as menu/game input.
+        event.stop()
         self._submit()
 
     def action_cancel(self) -> None:
@@ -227,8 +231,8 @@ class TermTypr(App):
             "games": self.router.get_available_games(),
             "selected_index": self.router.selected_game_index,
             "instructions": [
-                "Use ↑/↓ arrow keys or numbers to navigate",
-                "Press ENTER to select a game",
+                "Use ↑/↓ arrow keys or number keys to choose a game",
+                "Press ENTER to start the selected game",
                 "Press 'Ctrl+Q' to quit",
                 "Press 'Ctrl+S' to view statistics",
             ],
@@ -316,6 +320,10 @@ class TermTypr(App):
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         """Handle input submission."""
+        if event.input.id != "main-input":
+            # Inputs in dialogs/modals are not mine to handle
+            return
+
         input_value = event.input.value.strip()
 
         if self.current_view == "menu":
@@ -324,9 +332,18 @@ class TermTypr(App):
         elif self.current_view == "game" and input_value:
             # Process game input (only if not empty)
             self._process_game_input(input_value)
+            event.input.value = ""
 
     def on_input_changed(self, event: Input.Changed) -> None:
-        """Handle real-time input changes for game."""
+        """Handle real-time input changes for menu selection and game typing."""
+        if event.input.id != "main-input":
+            # Inputs in dialogs/modals are not mine to handle
+            return
+
+        if self.current_view == "menu":
+            self._handle_menu_digit(event.input)
+            return
+
         if self.current_view != "game":
             return
 
@@ -338,14 +355,46 @@ class TermTypr(App):
 
         # Handle space bar for word completion
         if " " in input_text:
-            self._process_game_input(input_text.strip(), is_complete=True)
-            event.input.value = ""
+            self._submit_completed_words(input_text, event.input)
             return
 
         # Process partial input for real-time feedback through the controller
         # This ensures game_state transitions to active on first character
         self.router.process_game_input(input_text, is_complete=False)
         self._update_game_display()
+
+        # The last word completes without a trailing space
+        if self.router.is_game_finished():
+            event.input.value = ""
+            self._finish_current_game()
+
+    def _handle_menu_digit(self, input_field: Input) -> None:
+        """Select a menu entry when the user types its number."""
+        value = input_field.value.strip()
+        if not value:
+            return
+
+        if value.isdigit() and self.router.select_game(int(value) - 1):
+            self._update_menu_display()
+
+        # The input field is reserved for game typing; keep it empty in menu
+        input_field.value = ""
+
+    def _submit_completed_words(self, input_text: str, input_field: Input) -> None:
+        """Submit space-terminated words, bare spaces never skip a word."""
+        words = input_text.split()
+
+        remainder = ""
+        if words and not input_text.endswith(" "):
+            remainder = words.pop()
+
+        for word in words:
+            if not self.router.is_game_active():
+                break
+            self._process_game_input(word, is_complete=True)
+
+        if self.router.is_game_active():
+            input_field.value = remainder
 
     def _start_selected_game(self) -> None:
         """Start the currently selected game."""
@@ -378,9 +427,6 @@ class TermTypr(App):
 
         self.router.process_game_input(word, is_complete)
         self._update_game_display()
-
-        if is_complete:
-            self.query_one(Input).value = ""
 
         # Check if game finished
         if self.router.is_game_finished():
@@ -427,6 +473,11 @@ class TermTypr(App):
 
     def _show_stats(self) -> None:
         """Show the statistics view with typing test records."""
+        # Reachable mid-game via the command palette
+        self._stop_stats_timer()
+        if self.router.is_game_active():
+            self.router.cancel_game()
+
         self._set_active_view("stats")
 
         all_results = self.router.get_all_games(sort="asc")
@@ -507,7 +558,8 @@ class TermTypr(App):
                 self.action_main_menu()
         else:
             # Return to menu from results/stats views
-            self._show_main_menu()
+            # (via action_main_menu so timers/games are cleaned up)
+            self.action_main_menu()
 
 
 def run_new_app() -> None:

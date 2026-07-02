@@ -1,12 +1,16 @@
 """JSON file-based implementation of history repository."""
 
 import json
+import logging
+import os
 from pathlib import Path
 from typing import Literal
 
 from termtypr.config import RECORDS_FILE
 from termtypr.domain.history_repository import HistoryRepository
 from termtypr.domain.models.game_result import GameResult
+
+logger = logging.getLogger(__name__)
 
 
 class JsonHistoryRepository(HistoryRepository):
@@ -44,18 +48,36 @@ class JsonHistoryRepository(HistoryRepository):
             return {"history": []}
 
     def _save_data(self, data: dict) -> None:
-        """Save data to JSON file."""
-        with open(self.file_path, "w", encoding="utf-8") as f:
+        """Save data to JSON file atomically.
+
+        Writing to a temp file first prevents a crash mid-write from
+        corrupting (and thereby silently wiping) the whole history.
+        """
+        tmp_path = self.file_path.with_suffix(".json.tmp")
+        with open(tmp_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
+        os.replace(tmp_path, self.file_path)
+
+    @staticmethod
+    def _parse_record(record: dict) -> GameResult | None:
+        """Parse a single history record, returning None if it is corrupt."""
+        try:
+            return GameResult.from_dict(record)
+        except (ValueError, TypeError, AttributeError) as exc:
+            logger.warning("Skipping corrupt history record %r: %s", record, exc)
+            return None
 
     def _load_results(self) -> list[GameResult]:
-        """Load and cache parsed GameResult objects (unsorted)."""
+        """Load and cache parsed GameResult objects (unsorted).
+
+        Corrupt records are skipped (with a warning) instead of crashing.
+        """
         if self._results_cache is not None:
             return self._results_cache
 
-        data = self._load_data()
-        history = data.get("history", [])
-        self._results_cache = [GameResult.from_dict(record) for record in history]
+        history = self._load_data().get("history", [])
+        parsed = (self._parse_record(record) for record in history)
+        self._results_cache = [result for result in parsed if result is not None]
         return self._results_cache
 
     def save(self, result: GameResult) -> None:

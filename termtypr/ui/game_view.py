@@ -123,6 +123,7 @@ class GameStatsView(Static):
     def render(self) -> Panel:
         """Render the statistics display."""
         wpm = self.stats.get("wpm", 0.0) if self.stats else 0.0
+        raw_wpm = self.stats.get("raw_wpm", 0.0) if self.stats else 0.0
         accuracy = self.stats.get("accuracy", 100.0) if self.stats else 0.0
         elapsed_time = self.stats.get("elapsed_time", 0.0) if self.stats else 0.0
         has_data = bool(self.stats)
@@ -137,6 +138,7 @@ class GameStatsView(Static):
             Text("Statistics", style="bold"),
             Text(""),
             Text(f"WPM: {wpm:.1f}" if has_data else "WPM: --", style="yellow"),
+            Text(f"Raw: {raw_wpm:.1f}" if has_data else "Raw: --", style="dim"),
             Text(
                 f"Accuracy: {accuracy:.1f}%" if has_data else "Accuracy: --",
                 style="yellow",

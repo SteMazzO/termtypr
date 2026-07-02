@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Raw WPM**: Gross WPM (no error penalty) shown live and in results, and persisted in history
+- **Number-key game selection**: Pressing a game's number in the main menu now selects it (previously documented but not implemented)
+- **Custom words file**: `add_words` now writes to `custom_words.json` in the user data directory instead of modifying the installed package
+
+### Changed
+
+- **Test ends on the last character**: The final word completes as soon as it is typed correctly
+- **Live WPM includes the in-progress word**, so it no longer sags between word submissions or reads 0 during the first word
+- **Accuracy is keystroke-based**: correct keystrokes / total keystrokes, including the submitting space
+- **WPM sanity floor**: results measured over less than 1 second report 0 WPM instead of absurd values
+- Returning to the main menu keeps the previously selected game highlighted
+
+### Fixed
+
+- **Word-count dialog no longer leaks input into the app**: pressing Enter in the dialog used to start a game from the menu, and typing in it mid-game corrupted the running game's words and error count
+- **Stray/double spaces no longer silently skip words** 
+- **Pasted multi-word text** is now split and submitted word by word instead of as one wrong word
+- **History file robustness**: writes are atomic and corrupt records are skipped instead of crashing the stats view or silently wiping history
+- Escaping from the stats/results views now runs the same cleanup as returning to the menu
+- Cancelled games can no longer be finished and saved to history
+
 ## [0.5.0] - 2026-02-xx
 
 ### Added

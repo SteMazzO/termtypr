@@ -318,7 +318,7 @@ class StatsView(VerticalScroll):
                     self._create_wpm_accuracy_chart(),
                     title=(
                         f"\U0001f4c9 WPM vs Accuracy \u2014"
-                        f" {stats['total_tests']} Tests"
+                        f" {n_records} Tests"
                         f" (Avg: {stats['avg_accuracy']:.1f}%)"
                     ),
                     border_style="cyan",
