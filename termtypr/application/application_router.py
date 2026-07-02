@@ -9,7 +9,7 @@ from typing import Any, Literal
 from termtypr.config import user_preferences
 from termtypr.domain.history_repository import HistoryRepository
 from termtypr.domain.models.game_result import GameResult
-from termtypr.games.base_game import BaseGame
+from termtypr.games.base_game import BaseGame, GameStatus
 from termtypr.games.phrase_typing_game import PhraseTypingGame
 from termtypr.games.random_words_game import RandomWordsGame
 
@@ -90,6 +90,8 @@ class ApplicationRouter:
         """Finish the current game, persist the result, and return it."""
         if not self.current_game:
             return None
+        if self.current_game.status is GameStatus.CANCELLED:
+            return None
 
         result = self.current_game.finish()
 
@@ -164,7 +166,6 @@ class ApplicationRouter:
             if not self.current_game.is_finished():
                 self.current_game.cancel()
             self.current_game = None
-        self.selected_game_index = 0
 
     def get_all_games(self, sort: Literal["asc", "desc"] = "desc") -> list[GameResult]:
         """Get all game results from history."""

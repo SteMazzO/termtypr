@@ -32,6 +32,7 @@ class ResultsView(Static):
 
         # Extract result data
         wpm = self.result.wpm
+        raw_wpm = self.result.raw_wpm
         accuracy = self.result.accuracy
         duration = self.result.duration
         is_new_record = self.result.is_new_record
@@ -52,6 +53,7 @@ class ResultsView(Static):
         content_parts.extend(
             [
                 Text(f"Words Per Minute: {wpm:.1f} WPM", style="bold yellow"),
+                Text(f"Raw (no error penalty): {raw_wpm:.1f} WPM", style="dim"),
                 Text(f"Accuracy: {accuracy:.1f}%", style="bold yellow"),
                 Text(f"Time: {duration:.1f} seconds", style="bold yellow"),
                 Text(""),

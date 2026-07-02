@@ -1,6 +1,5 @@
 """Tests for ApplicationRouter."""
 
-import time
 from datetime import datetime, timezone
 
 import pytest
@@ -243,6 +242,15 @@ class TestGameLifecycle:
 
         assert result is None
 
+    def test_finish_game_cancelled_not_saved(self, router, repository):
+        """A cancelled game is never finished or persisted."""
+        router.select_game(0)
+        router.start_game({"word_count": 5})
+        router.current_game.cancel()
+
+        assert router.finish_game() is None
+        assert repository.get_all() == []
+
     def test_return_to_main_menu(self, router):
         """Test returning to main menu."""
         router.return_to_main_menu()
@@ -311,10 +319,10 @@ class TestGameLifecycle:
         router.select_game(0)
         router.start_game({"word_count": 5})
 
-        # Add delays between word submissions to ensure non-zero duration and WPM
         for word in router.current_game.target_words:
             router.process_game_input(word, is_complete=True)
-            time.sleep(0.1)
+
+        router.current_game.start_time -= 60
 
         result = router.finish_game()
         assert result.is_new_record is True

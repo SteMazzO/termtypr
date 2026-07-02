@@ -15,6 +15,7 @@ DATA_DIR = Path(platformdirs.user_data_dir("termtypr"))
 
 RECORDS_FILE = DATA_DIR / "history.json"
 PREFERENCES_FILE = DATA_DIR / "preferences.json"
+USER_WORDS_FILE = DATA_DIR / "custom_words.json"
 
 WORDS_FILE = Path(
     importlib.resources.files("termtypr.data.resources").joinpath("words.json")
