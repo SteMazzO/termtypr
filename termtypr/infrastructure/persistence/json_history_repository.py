@@ -53,7 +53,8 @@ class JsonHistoryRepository(HistoryRepository):
         Writing to a temp file first prevents a crash mid-write from
         corrupting (and thereby silently wiping) the whole history.
         """
-        tmp_path = self.file_path.with_suffix(".json.tmp")
+        self.file_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp_path = self.file_path.with_name(self.file_path.name + ".tmp")
         with open(tmp_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
         os.replace(tmp_path, self.file_path)
