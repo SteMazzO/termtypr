@@ -3,8 +3,8 @@
 import typer
 
 from termtypr.data.word_storage import WordStorage
-from termtypr.infrastructure.persistence.json_history_repository import (
-    JsonHistoryRepository,
+from termtypr.infrastructure.persistence.sqlite_history_repository import (
+    SqliteHistoryRepository,
 )
 from termtypr.ui.main_app import run_new_app
 
@@ -49,7 +49,7 @@ def add_words(
 @app.command()
 def stats():
     """Show typing test statistics."""
-    repository = JsonHistoryRepository()
+    repository = SqliteHistoryRepository()
     all_results = repository.get_all()
 
     if not all_results:

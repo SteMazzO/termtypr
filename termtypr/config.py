@@ -13,9 +13,9 @@ from termtypr.infrastructure.persistence.json_preferences_repository import (
 # Paths
 DATA_DIR = Path(platformdirs.user_data_dir("termtypr"))
 
-RECORDS_FILE = DATA_DIR / "history.json"
 PREFERENCES_FILE = DATA_DIR / "preferences.json"
 USER_WORDS_FILE = DATA_DIR / "custom_words.json"
+DATABASE_FILE = DATA_DIR / "termtypr.db"
 
 WORDS_FILE = Path(
     importlib.resources.files("termtypr.data.resources").joinpath("words.json")

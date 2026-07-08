@@ -13,9 +13,10 @@ class InMemoryHistoryRepository(HistoryRepository):
         """Initialize empty in-memory storage."""
         self._results: list[GameResult] = []
 
-    def save(self, result: GameResult) -> None:
-        """Save a game result to memory."""
+    def save(self, result: GameResult) -> int:
+        """Save a game result to memory, returning its list index as id."""
         self._results.append(result)
+        return len(self._results) - 1
 
     def get_all(self, sort: Literal["asc", "desc"] = "desc") -> list[GameResult]:
         """Get all game results from memory.

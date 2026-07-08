@@ -123,8 +123,10 @@ class ApplicationRouter:
             True if the game was successfully restarted.
         """
         saved_words = None
+        saved_phrase = None
         if keep_same_text and self.current_game:
             saved_words = self.current_game.target_words.copy()
+            saved_phrase = self.current_game.phrase_text
 
         # Clean up the current game without touching selection
         if self.current_game:
@@ -137,6 +139,7 @@ class ApplicationRouter:
 
         if saved_words and self.current_game:
             self.current_game.target_words = saved_words
+            self.current_game.phrase_text = saved_phrase
 
         return True
 

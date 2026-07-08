@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **⚠️ History storage moved to SQLite** (`termtypr.db` in the user data directory).
+  The old `history.json` file is no longer read and is not migrated: typing history
+  recorded by earlier versions is not carried over.
+
 ## [0.6.0] - 2026-07-08
 
 ### Added

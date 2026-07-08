@@ -12,8 +12,8 @@ from termtypr.application.application_router import ApplicationRouter
 from termtypr.config import save_preferences, user_preferences
 from termtypr.domain.models.user_preferences import MAX_WORD_COUNT, MIN_WORD_COUNT
 from termtypr.games.base_game import GameStatus
-from termtypr.infrastructure.persistence.json_history_repository import (
-    JsonHistoryRepository,
+from termtypr.infrastructure.persistence.sqlite_history_repository import (
+    SqliteHistoryRepository,
 )
 from termtypr.ui.game_view import GameView
 from termtypr.ui.main_menu_view import MainMenuView
@@ -169,7 +169,7 @@ class TermTypr(App):
         super().__init__()
 
         # Initialize application router with repository
-        history_repository = JsonHistoryRepository()
+        history_repository = SqliteHistoryRepository()
         self.router = ApplicationRouter(history_repository)
 
         # UI state

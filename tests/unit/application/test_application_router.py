@@ -351,6 +351,16 @@ class TestGameLifecycle:
         assert router.current_game.target_words == original_words
         assert router.selected_game_index == 1
 
+    def test_restart_game_same_text_preserves_phrase(self, router):
+        """Restarting with the same text keeps the phrase identity too."""
+        router.select_game(1)
+        router.start_game()
+        original_phrase = router.current_game.phrase_text
+        assert original_phrase is not None
+
+        assert router.restart_game(keep_same_text=True)
+        assert router.current_game.phrase_text == original_phrase
+
     def test_restart_game_new_text(self, router):
         """Test restarting generates fresh content."""
         router.select_game(0)

@@ -26,7 +26,9 @@ class PhraseTypingGame(BaseGame):
         if self.status != GameStatus.READY:
             return False
 
-        self.target_words = get_random_phrase().split()
+        phrase = get_random_phrase()
+        self.target_words = phrase.split()
         self._reset_state()
+        self.phrase_text = phrase
         self.status = GameStatus.READY
         return True

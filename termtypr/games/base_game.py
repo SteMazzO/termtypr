@@ -41,6 +41,9 @@ class BaseGame(ABC):
 
         # Game state
         self.target_words: list[str] = []
+        # Original phrase string for phrase-based games (None otherwise);
+        # target_words alone can't reproduce it exactly.
+        self.phrase_text: str | None = None
         self.typed_words: list[str] = []
         self.current_word_index = 0
         self.start_time = 0.0
@@ -269,6 +272,7 @@ class BaseGame(ABC):
                 if typed == target
             ),
             error_count=self.error_count,
+            phrase_text=self.phrase_text,
         )
 
         return self.result
