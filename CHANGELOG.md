@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-07-08
+
 ### Added
 
 - **Raw WPM**: Gross WPM (no error penalty) shown live and in results, and persisted in history
@@ -30,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Escaping from the stats/results views now runs the same cleanup as returning to the menu
 - Cancelled games can no longer be finished and saved to history
 
-## [0.5.0] - 2026-02-xx
+## [0.5.0] - 2026-02-25
 
 ### Added
 
