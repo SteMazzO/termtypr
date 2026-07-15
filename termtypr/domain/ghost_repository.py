@@ -34,6 +34,10 @@ class GhostRepository(ABC):
         """Get all saved ghost runs, newest first."""
 
     @abstractmethod
+    def get_random(self) -> "GhostRun | None":
+        """Get a random saved ghost run, or None when there are none."""
+
+    @abstractmethod
     def delete(self, ghost_id: int) -> bool:
         """Delete a ghost run by id.
 

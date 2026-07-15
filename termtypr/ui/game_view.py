@@ -138,7 +138,7 @@ class GhostWordsView(TypedWordsDisplay):
         """Render the ghost's replayed typing."""
         title = f"Ghost ({self.ghost_wpm:.1f} WPM)"
         if self.finished_in is not None:
-            title += f" — finished in {self.finished_in:.1f}s"
+            title += f" - finished in {self.finished_in:.1f}s"
 
         return Panel(
             self.styled_words_text(),

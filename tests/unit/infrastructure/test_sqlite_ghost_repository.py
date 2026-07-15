@@ -99,6 +99,17 @@ def test_get_all_newest_first(repo):
     assert [g.phrase_text for g in ghosts] == ["phrase two", "phrase one"]
 
 
+def test_get_random(repo):
+    """get_random returns a saved run, or None when there are none."""
+    assert repo.get_random() is None
+
+    repo.save(make_ghost(phrase="only phrase"))
+
+    ghost = repo.get_random()
+    assert ghost is not None
+    assert ghost.phrase_text == "only phrase"
+
+
 def test_delete(repo):
     """Ghosts can be deleted by id; unknown ids report False."""
     ghost_id = repo.save(make_ghost())

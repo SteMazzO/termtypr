@@ -19,11 +19,15 @@ class GhostService:
         """Get the saved ghost for a phrase, if any."""
         return self.repository.get_by_phrase_hash(phrase_hash)
 
+    def get_random_ghost(self) -> GhostRun | None:
+        """Get a random saved ghost, or None when there are none."""
+        return self.repository.get_random()
+
     def qualifies(self, result: GameResult) -> bool:
         """Check the quality floor every ghost save must meet.
 
         A run qualifies when it is a phrase run with a meaningful WPM and
-        at least the configured minimum accuracy — a fast but sloppy run
+        at least the configured minimum accuracy - a fast but sloppy run
         makes a poor opponent.
         """
         return (
@@ -43,7 +47,7 @@ class GhostService:
         """Check whether this run is saved as a ghost without asking.
 
         In both automatic modes a run only replaces the phrase's existing
-        ghost when it scores higher — each phrase keeps its best run.
+        ghost when it scores higher - each phrase keeps its best run.
         """
         mode = user_preferences.ghost_save_mode
         if mode not in (GhostSaveMode.AUTO_BEST, GhostSaveMode.AUTO_THRESHOLD):

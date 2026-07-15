@@ -7,9 +7,18 @@ from typing import TYPE_CHECKING
 from textual.app import App, ComposeResult, SystemCommand
 from textual.containers import Container, Horizontal, Vertical
 from textual.screen import ModalScreen, Screen
-from textual.widgets import Button, Footer, Header, Input, Label, Select, Static
+from textual.widgets import (
+    Button,
+    DataTable,
+    Footer,
+    Header,
+    Input,
+    Label,
+    Select,
+    Static,
+)
 
-from termtypr.application.application_router import ApplicationRouter
+from termtypr.application.application_router import AVAILABLE_GAMES, ApplicationRouter
 from termtypr.application.ghost_service import GhostService
 from termtypr.config import save_preferences, user_preferences
 from termtypr.core.ghost_replay import GhostReplay
@@ -24,6 +33,7 @@ from termtypr.domain.models.user_preferences import (
     GhostSaveMode,
 )
 from termtypr.games.base_game import GameStatus
+from termtypr.games.ghost_race_game import GhostRaceGame
 from termtypr.infrastructure.persistence.sqlite_ghost_repository import (
     SqliteGhostRepository,
 )
@@ -39,8 +49,8 @@ if TYPE_CHECKING:
     from termtypr.domain.models.game_result import GameResult
 
 GHOST_SAVE_MODE_LABELS = {
-    GhostSaveMode.AUTO_BEST: "Auto — save best run per phrase",
-    GhostSaveMode.AUTO_THRESHOLD: "Auto — save runs above WPM threshold",
+    GhostSaveMode.AUTO_BEST: "Auto - save best run per phrase",
+    GhostSaveMode.AUTO_THRESHOLD: "Auto - save runs above WPM threshold",
     GhostSaveMode.ALWAYS_ASK: "Ask after each phrase run",
     GhostSaveMode.NEVER: "Never save ghosts",
 }
@@ -282,6 +292,93 @@ class GhostSettingsDialog(ModalScreen[dict | None]):
         )
 
 
+class GhostManagerDialog(ModalScreen[None]):
+    """Modal dialog listing saved ghosts, with delete support."""
+
+    CSS = """
+    GhostManagerDialog {
+        align: center middle;
+    }
+
+    #ghost-manager-dialog {
+        width: 90;
+        max-width: 95%;
+        height: auto;
+        max-height: 30;
+        border: thick $accent;
+        background: $surface;
+        padding: 1 2;
+    }
+
+    #gm-title {
+        text-style: bold;
+        margin-bottom: 1;
+    }
+
+    #gm-table {
+        height: auto;
+        max-height: 20;
+    }
+
+    #gm-hint {
+        color: $text-muted;
+        margin-top: 1;
+    }
+    """
+
+    BINDINGS = [  # noqa
+        ("escape", "close", "Close"),
+        ("d", "delete_selected", "Delete"),
+    ]
+
+    def __init__(self, ghost_service: GhostService):
+        super().__init__()
+        self.ghost_service = ghost_service
+
+    def compose(self) -> ComposeResult:
+        """Create the dialog layout."""
+        with Vertical(id="ghost-manager-dialog"):
+            yield Label("Saved Ghosts", id="gm-title")
+            yield DataTable(id="gm-table")
+            yield Static(
+                "Press D to delete the selected ghost, ESC to close", id="gm-hint"
+            )
+
+    def on_mount(self) -> None:
+        """Populate the table with the saved ghosts."""
+        table = self.query_one(DataTable)
+        table.cursor_type = "row"
+        table.add_columns("Phrase", "WPM", "Accuracy", "Time", "Saved")
+        for ghost in self.ghost_service.repository.get_all():
+            phrase = ghost.phrase_text
+            excerpt = phrase if len(phrase) <= 60 else phrase[:59] + "…"
+            table.add_row(
+                excerpt,
+                f"{ghost.wpm:.1f}",
+                f"{ghost.accuracy:.1f}%",
+                f"{ghost.duration:.1f}s",
+                ghost.timestamp.strftime("%Y-%m-%d"),
+                key=str(ghost.id),
+            )
+        table.focus()
+
+    def action_close(self) -> None:
+        """Close the dialog."""
+        self.dismiss(None)
+
+    def action_delete_selected(self) -> None:
+        """Delete the ghost under the cursor."""
+        table = self.query_one(DataTable)
+        if table.row_count == 0:
+            return
+
+        row_key, _ = table.coordinate_to_cell_key(table.cursor_coordinate)
+        if row_key.value is None:
+            return
+        if self.ghost_service.repository.delete(int(row_key.value)):
+            table.remove_row(row_key)
+
+
 class TermTypr(App):
     """Main application class."""
 
@@ -437,11 +534,24 @@ class TermTypr(App):
         """Show the results view with game results."""
         self._set_active_view("results")
 
-        self.query_one(ResultsView).update_results(result)
-        input_field = self.query_one(Input)
-        input_field.placeholder = (
-            "Press ENTER to play again, ESC for menu, Ctrl+Q to quit"
+        can_race_ghost = self.router.has_ghost_for_current_phrase()
+        ghost_save_pending = self.router.has_pending_ghost_save()
+        self.query_one(ResultsView).update_results(
+            result,
+            race_outcome=self.router.last_race_outcome,
+            can_race_ghost=can_race_ghost,
+            ghost_save_pending=ghost_save_pending,
         )
+
+        placeholder = "Press ENTER to play again"
+        if can_race_ghost:
+            placeholder += ", R to race the ghost"
+        if ghost_save_pending:
+            placeholder += ", S to save as ghost"
+        placeholder += ", ESC for menu, Ctrl+Q to quit"
+
+        input_field = self.query_one(Input)
+        input_field.placeholder = placeholder
         input_field.value = ""
 
     def on_key(self, event) -> None:
@@ -484,6 +594,22 @@ class TermTypr(App):
             self.query_one(Input).value = ""
             self._restart_current_game()
 
+    def _start_ghost_rematch(self) -> None:
+        """Race the saved ghost of the phrase just played."""
+        self.query_one(Input).value = ""
+        if self.router.start_ghost_rematch():
+            self._begin_game_session()
+
+    def _save_pending_ghost(self) -> None:
+        """Save the finished run as a ghost when a decision is pending."""
+        self.query_one(Input).value = ""
+        if self.router.save_pending_ghost():
+            self.notify("Run saved as ghost")
+            # Re-render results: the save hint disappears, racing unlocks
+            result = self.query_one(ResultsView).result
+            if result is not None:
+                self._show_results_view(result)
+
     def _update_menu_display(self) -> None:
         """Update the menu display with current selection."""
         self.query_one(MainMenuView).update_menu_data(self._get_menu_data())
@@ -514,6 +640,12 @@ class TermTypr(App):
             self._handle_menu_digit(event.input)
             return
 
+        if self.current_view == "results":
+            # Printable keys are consumed by the focused Input and never
+            # reach on_key, so letter shortcuts arrive here instead
+            self._handle_results_shortcut(event.input)
+            return
+
         if self.current_view != "game":
             return
 
@@ -537,6 +669,18 @@ class TermTypr(App):
         if self.router.is_game_finished():
             event.input.value = ""
             self._finish_current_game()
+
+    def _handle_results_shortcut(self, input_field: Input) -> None:
+        """Trigger results-view letter shortcuts typed into the input."""
+        value = input_field.value.strip().lower()
+        if not value:
+            return
+
+        input_field.value = ""
+        if value == "r":
+            self._start_ghost_rematch()
+        elif value == "s":
+            self._save_pending_ghost()
 
     def _handle_menu_digit(self, input_field: Input) -> None:
         """Select a menu entry when the user types its number."""
@@ -570,6 +714,14 @@ class TermTypr(App):
         """Start the currently selected game."""
         if self.router.start_game():
             self._begin_game_session()
+            return
+
+        game_def = AVAILABLE_GAMES[self.router.selected_game_index]
+        if game_def["game_class"] is GhostRaceGame:
+            self.notify(
+                "No ghosts saved yet - finish a phrase run first",
+                severity="warning",
+            )
 
     def _begin_game_session(self) -> None:
         """Common setup after a game starts: fetch best WPM, show view, start timer."""
@@ -743,6 +895,12 @@ class TermTypr(App):
         )
 
         yield SystemCommand(
+            "Manage Ghosts",
+            "List and delete saved ghost runs",
+            self._open_ghost_manager,
+        )
+
+        yield SystemCommand(
             "Statistics",
             "View your typing statistics",
             self._show_stats,
@@ -781,6 +939,11 @@ class TermTypr(App):
     def _open_ghost_settings_dialog(self) -> None:
         """Open the ghost-settings modal and apply the result."""
         self.push_screen(GhostSettingsDialog(), callback=self._on_ghost_settings_result)
+
+    def _open_ghost_manager(self) -> None:
+        """Open the saved-ghosts list modal."""
+        if self.router.ghost_service is not None:
+            self.push_screen(GhostManagerDialog(self.router.ghost_service))
 
     def _on_ghost_settings_result(self, values: dict | None) -> None:
         """Callback when the ghost-settings dialog is dismissed."""

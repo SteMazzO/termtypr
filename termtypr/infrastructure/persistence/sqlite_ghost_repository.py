@@ -101,6 +101,13 @@ class SqliteGhostRepository(GhostRepository):
         ).fetchall()
         return [self._row_to_ghost(row) for row in rows]
 
+    def get_random(self) -> GhostRun | None:
+        """Get a random saved ghost run, or None when there are none."""
+        row = self._conn.execute(
+            "SELECT * FROM ghost_runs ORDER BY RANDOM() LIMIT 1"
+        ).fetchone()
+        return self._row_to_ghost(row) if row else None
+
     def delete(self, ghost_id: int) -> bool:
         """Delete a ghost run by id."""
         with self._conn:

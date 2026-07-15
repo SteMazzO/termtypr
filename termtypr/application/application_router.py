@@ -10,14 +10,20 @@ from typing import Any, Literal
 from termtypr.application.ghost_service import GhostService
 from termtypr.config import user_preferences
 from termtypr.core.ghost_recorder import GhostRecorder
+from termtypr.core.phrase_hash import phrase_hash
 from termtypr.domain.history_repository import HistoryRepository
 from termtypr.domain.models.game_result import GameResult
-from termtypr.domain.models.ghost_run import GhostRun
+from termtypr.domain.models.ghost_run import GhostRun, RaceOutcome, RecordingEvent
 from termtypr.games.base_game import BaseGame, GameStatus
+from termtypr.games.ghost_race_game import GhostRaceGame
 from termtypr.games.phrase_typing_game import PhraseTypingGame
 from termtypr.games.random_words_game import RandomWordsGame
 
-_GAME_CLASSES: list[type[BaseGame]] = [RandomWordsGame, PhraseTypingGame]
+_GAME_CLASSES: list[type[BaseGame]] = [
+    RandomWordsGame,
+    PhraseTypingGame,
+    GhostRaceGame,
+]
 
 AVAILABLE_GAMES: list[dict[str, Any]] = [
     {
@@ -43,6 +49,12 @@ class ApplicationRouter:
         self.ghost_recorder = GhostRecorder()
         # Ghost currently being raced; None outside of a race
         self.active_ghost: GhostRun | None = None
+        # Outcome of the last finished race, for the results view
+        self.last_race_outcome: RaceOutcome | None = None
+        # Finished run awaiting the user's save decision (ALWAYS_ASK mode)
+        self._pending_ghost_save: (
+            tuple[GameResult, tuple[RecordingEvent, ...], int | None] | None
+        ) = None
         self.current_game: BaseGame | None = None
         self.selected_game_index = 0
 
@@ -91,6 +103,27 @@ class ApplicationRouter:
         self.current_game = game
         self.ghost_recorder.reset()
         self.active_ghost = None
+        self._pending_ghost_save = None
+
+        if isinstance(game, GhostRaceGame) and not self._enter_ghost_race(game):
+            self.current_game = None
+            return False
+
+        return True
+
+    def _enter_ghost_race(self, game: GhostRaceGame) -> bool:
+        """Point a race-mode game at a random saved ghost's phrase."""
+        ghost = (
+            self.ghost_service.get_random_ghost()
+            if self.ghost_service is not None
+            else None
+        )
+        if ghost is None:
+            return False
+
+        game.target_words = ghost.phrase_text.split()
+        game.phrase_text = ghost.phrase_text
+        self.active_ghost = ghost
         return True
 
     def process_game_input(self, input_text: str, is_complete: bool = False) -> bool:
@@ -134,14 +167,80 @@ class ApplicationRouter:
 
         history_id = self.history_repository.save(result)
 
-        if self.ghost_service is not None and self.ghost_service.should_auto_save(
-            result
-        ):
-            self.ghost_service.save_ghost(
-                result, self.ghost_recorder.recording, history_id
+        # A race ends with this run; keep the outcome for the results view
+        self.last_race_outcome = None
+        if self.active_ghost is not None:
+            self.last_race_outcome = RaceOutcome(
+                ghost=self.active_ghost, player_duration=result.duration
             )
+            self.active_ghost = None
+
+        if self.ghost_service is not None:
+            if self.ghost_service.should_auto_save(result):
+                self.ghost_service.save_ghost(
+                    result, self.ghost_recorder.recording, history_id
+                )
+            elif self.ghost_service.should_prompt(result):
+                self._pending_ghost_save = (
+                    result,
+                    self.ghost_recorder.recording,
+                    history_id,
+                )
 
         return result
+
+    def has_pending_ghost_save(self) -> bool:
+        """Check whether a finished run awaits a ghost-save decision."""
+        return self._pending_ghost_save is not None
+
+    def save_pending_ghost(self) -> bool:
+        """Save the run awaiting a decision (ALWAYS_ASK mode).
+
+        Returns:
+            True when a pending run was saved.
+        """
+        if self._pending_ghost_save is None or self.ghost_service is None:
+            return False
+
+        result, recording, history_id = self._pending_ghost_save
+        self.ghost_service.save_ghost(result, recording, history_id)
+        self._pending_ghost_save = None
+        return True
+
+    def has_ghost_for_current_phrase(self) -> bool:
+        """Check whether the current game's phrase has a saved ghost."""
+        if self.ghost_service is None or self.current_game is None:
+            return False
+        phrase_text = self.current_game.phrase_text
+        if phrase_text is None:
+            return False
+        return (
+            self.ghost_service.get_ghost_for_phrase(phrase_hash(phrase_text))
+            is not None
+        )
+
+    def start_ghost_rematch(self) -> bool:
+        """Restart the finished phrase as a race against its saved ghost.
+
+        Returns:
+            True when a race started; False when there is no game, no
+            phrase, or no saved ghost for it.
+        """
+        if self.ghost_service is None or self.current_game is None:
+            return False
+        phrase_text = self.current_game.phrase_text
+        if phrase_text is None:
+            return False
+
+        ghost = self.ghost_service.get_ghost_for_phrase(phrase_hash(phrase_text))
+        if ghost is None:
+            return False
+
+        if not self.restart_game(keep_same_text=True):
+            return False
+
+        self.active_ghost = ghost
+        return True
 
     def cancel_game(self) -> bool:
         """Cancel the current game without saving results."""
@@ -181,7 +280,10 @@ class ApplicationRouter:
         if saved_words and self.current_game:
             self.current_game.target_words = saved_words
             self.current_game.phrase_text = saved_phrase
-        self.active_ghost = saved_ghost
+        if keep_same_text:
+            # New text keeps whatever start_game decided (nothing for
+            # normal games, a fresh random ghost in race mode)
+            self.active_ghost = saved_ghost
 
         return True
 

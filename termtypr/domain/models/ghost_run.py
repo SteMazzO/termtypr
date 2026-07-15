@@ -50,3 +50,21 @@ class GhostRun:
     def score(self) -> float:
         """Ranking score used for retention decisions."""
         return self.wpm * self.accuracy
+
+
+@dataclass(frozen=True)
+class RaceOutcome:
+    """The result of a finished race against a ghost."""
+
+    ghost: GhostRun
+    player_duration: float
+
+    @property
+    def won(self) -> bool:
+        """True when the player finished before the ghost."""
+        return self.player_duration < self.ghost.duration
+
+    @property
+    def delta_seconds(self) -> float:
+        """Seconds the player finished behind (positive) or ahead of the ghost."""
+        return self.player_duration - self.ghost.duration

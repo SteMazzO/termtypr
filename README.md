@@ -9,11 +9,12 @@ Practice your typing right in the terminal. Track your speed, see where you impr
 
 ## What it does
 
-- **Two game modes** — random words or full phrases
-- **Live feedback** — WPM and accuracy update as you type
-- **Stats & charts** — see your history, personal bests, and trends over time
-- **Customizable** — set the word count per game, switch themes, add your own words
-- **Runs anywhere** — works on any terminal with Python 3.10+
+- **Three game modes** - random words, full phrases, or racing your own ghosts
+- **Ghost racing** - replay your best phrase runs keystroke by keystroke and race against them
+- **Live feedback** - WPM and accuracy update as you type
+- **Stats & charts** - see your history, personal bests, and trends over time
+- **Customizable** - set the word count per game, switch themes, add your own words
+- **Runs anywhere** - works on any terminal with Python 3.10+
 
 ## Install and run
 
@@ -23,6 +24,24 @@ termtypr
 ```
 
 That's it. The main menu lets you pick a game mode and start typing.
+
+## Ghost racing
+
+Finish a phrase run and TermTypr can save it as a **ghost** - a full replay of your
+typing, corrections included. Race it two ways:
+
+- **Instant rematch** - press `R` on the results screen to race the saved ghost of the
+  phrase you just typed
+- **Race a Ghost** - the menu mode picks one of your saved ghosts and races its phrase
+
+During a race the ghost types in its own panel above yours, and the stats panel shows
+how far ahead or behind you are. The race clock starts on your first keystroke, so take
+your time getting ready.
+
+By default the best run per phrase is saved automatically (up to a global cap, worst
+runs pruned first). The command palette (`Ctrl+P`) has **Ghost Settings** for the save
+mode - always ask, never, auto-best, or above a WPM threshold - and **Manage Ghosts**
+to list and delete saved runs.
 
 ## CLI commands
 
@@ -53,7 +72,7 @@ pytest tests/ -v
 
 ## Contributing
 
-Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
+Contributions are welcome - see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 

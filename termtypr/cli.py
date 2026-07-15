@@ -30,7 +30,7 @@ def start():
 
 @app.command()
 def add_words(
-    words: list[str] = typer.Argument(None, help="Words to add to the storage")  #  noqa
+    words: list[str] = typer.Argument(None, help="Words to add to the storage"),  #  noqa
 ):
     """Add words to the word storage."""
     if not words:
@@ -87,7 +87,7 @@ def list_words():
 
     typer.echo(f"Total words in storage: {len(words)}")
     for i, word in enumerate(sorted(words)):
-        typer.echo(f"  {i+1}. {word}")
+        typer.echo(f"  {i + 1}. {word}")
 
 
 if __name__ == "__main__":

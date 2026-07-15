@@ -81,9 +81,10 @@ class TestRouterInitialization:
 
     def test_available_games_loaded(self, router):
         """Test available games are loaded."""
-        assert len(AVAILABLE_GAMES) == 2
+        assert len(AVAILABLE_GAMES) == 3
         assert AVAILABLE_GAMES[0]["name"] == "RandomWordsGame"
         assert AVAILABLE_GAMES[1]["name"] == "PhraseTypingGame"
+        assert AVAILABLE_GAMES[2]["name"] == "GhostRaceGame"
 
 
 class TestGameSelection:
@@ -93,7 +94,7 @@ class TestGameSelection:
         """Test getting available games list."""
         games = router.get_available_games()
 
-        assert len(games) == 2
+        assert len(games) == 3
         assert games[0]["name"] == "RandomWordsGame"
         assert games[0]["display_name"] == "Random Words"
         assert games[0]["is_selected"] is True
@@ -128,7 +129,7 @@ class TestGameSelection:
 
     def test_navigate_game_selection_wraps(self, router):
         """Test game selection wraps around."""
-        router.select_game(1)  # Last game
+        router.select_game(len(AVAILABLE_GAMES) - 1)  # Last game
         router.navigate_game_selection(1)  # Go down
 
         # Should wrap to first
@@ -479,6 +480,129 @@ class TestGhostRecording:
             self._type_word(router, word)
 
         assert router.finish_game() is not None
+
+
+class TestGhostRaceEntryPoints:
+    """Tests for starting races: Race a Ghost mode and instant rematch."""
+
+    RACE_GAME_INDEX = 2
+
+    @pytest.fixture
+    def ghost_service(self, tmp_path):
+        """Create a ghost service on a temp database."""
+        repo = SqliteGhostRepository(db_path=tmp_path / "test.db")
+        yield GhostService(repo)
+        repo.close()
+
+    @pytest.fixture
+    def ghost_router(self, tmp_path, ghost_service):
+        """Create a router with history and ghosts sharing one database."""
+        history_repo = SqliteHistoryRepository(db_path=tmp_path / "test.db")
+        yield ApplicationRouter(history_repo, ghost_service)
+        history_repo.close()
+
+    @staticmethod
+    def _finish_phrase_run(router):
+        """Complete the current phrase game and return its result."""
+        for word in router.current_game.target_words:
+            router.process_game_input(word, is_complete=True)
+        router.current_game.start_time -= 60
+        return router.finish_game()
+
+    def test_race_mode_without_ghosts_fails(self, ghost_router):
+        """Race a Ghost cannot start while no ghosts are saved."""
+        ghost_router.select_game(self.RACE_GAME_INDEX)
+
+        assert ghost_router.start_game() is False
+        assert ghost_router.current_game is None
+
+    def test_race_mode_races_a_saved_ghost(self, ghost_router):
+        """Race a Ghost picks a saved ghost and races its phrase."""
+        ghost_router.select_game(1)
+        ghost_router.start_game()
+        result = self._finish_phrase_run(ghost_router)  # auto-saves the ghost
+
+        ghost_router.select_game(self.RACE_GAME_INDEX)
+        assert ghost_router.start_game() is True
+
+        assert ghost_router.active_ghost is not None
+        assert ghost_router.active_ghost.phrase_text == result.phrase_text
+        assert ghost_router.current_game.phrase_text == result.phrase_text
+        assert ghost_router.current_game.target_words == result.phrase_text.split()
+
+    def test_rematch_races_the_finished_phrase(self, ghost_router):
+        """After a saved run, the rematch races the same phrase's ghost."""
+        ghost_router.select_game(1)
+        ghost_router.start_game()
+        result = self._finish_phrase_run(ghost_router)
+
+        assert ghost_router.start_ghost_rematch() is True
+        assert ghost_router.active_ghost is not None
+        assert ghost_router.active_ghost.phrase_text == result.phrase_text
+        assert ghost_router.current_game.phrase_text == result.phrase_text
+        assert ghost_router.is_game_active()
+
+    def test_rematch_without_saved_ghost_fails(self, ghost_router):
+        """The rematch requires a saved ghost for the phrase."""
+        user_preferences.ghost_save_mode = "never"
+        ghost_router.select_game(1)
+        ghost_router.start_game()
+        self._finish_phrase_run(ghost_router)
+
+        assert ghost_router.start_ghost_rematch() is False
+
+    def test_has_ghost_for_current_phrase(self, ghost_router):
+        """Ghost availability for the current phrase is reported correctly."""
+        ghost_router.select_game(1)
+        ghost_router.start_game()
+        assert ghost_router.has_ghost_for_current_phrase() is False
+
+        self._finish_phrase_run(ghost_router)
+
+        assert ghost_router.has_ghost_for_current_phrase() is True
+
+    def test_finishing_a_race_produces_an_outcome(self, ghost_router):
+        """Finishing while racing records the outcome and ends the race."""
+        ghost_router.select_game(1)
+        ghost_router.start_game()
+        self._finish_phrase_run(ghost_router)
+        assert ghost_router.last_race_outcome is None
+
+        assert ghost_router.start_ghost_rematch() is True
+        outcome_result = self._finish_phrase_run(ghost_router)
+
+        outcome = ghost_router.last_race_outcome
+        assert outcome is not None
+        assert outcome.player_duration == outcome_result.duration
+        assert ghost_router.active_ghost is None
+
+    def test_ask_mode_defers_save_until_confirmed(self, ghost_router, ghost_service):
+        """ALWAYS_ASK holds the run until the user saves it."""
+        user_preferences.ghost_save_mode = "ask"
+        ghost_router.select_game(1)
+        ghost_router.start_game()
+        result = self._finish_phrase_run(ghost_router)
+
+        assert ghost_service.get_ghost_for_phrase(result.phrase_hash) is None
+        assert ghost_router.has_pending_ghost_save() is True
+
+        assert ghost_router.save_pending_ghost() is True
+
+        assert ghost_service.get_ghost_for_phrase(result.phrase_hash) is not None
+        assert ghost_router.has_pending_ghost_save() is False
+        assert ghost_router.save_pending_ghost() is False
+
+    def test_pending_save_discarded_on_new_game(self, ghost_router):
+        """Starting a new game drops an unanswered save prompt."""
+        user_preferences.ghost_save_mode = "ask"
+        ghost_router.select_game(1)
+        ghost_router.start_game()
+        self._finish_phrase_run(ghost_router)
+        assert ghost_router.has_pending_ghost_save() is True
+
+        ghost_router.start_game()
+
+        assert ghost_router.has_pending_ghost_save() is False
 
 
 class TestGhostRaceState:
