@@ -1,14 +1,18 @@
 """Application router.
 
-coordinates game lifecycle, menu, and history.
+coordinates game lifecycle, menu, history, and ghost racing.
 """
 
+import time
 from dataclasses import replace
 from typing import Any, Literal
 
+from termtypr.application.ghost_service import GhostService
 from termtypr.config import user_preferences
+from termtypr.core.ghost_recorder import GhostRecorder
 from termtypr.domain.history_repository import HistoryRepository
 from termtypr.domain.models.game_result import GameResult
+from termtypr.domain.models.ghost_run import GhostRun
 from termtypr.games.base_game import BaseGame, GameStatus
 from termtypr.games.phrase_typing_game import PhraseTypingGame
 from termtypr.games.random_words_game import RandomWordsGame
@@ -29,8 +33,16 @@ AVAILABLE_GAMES: list[dict[str, Any]] = [
 class ApplicationRouter:
     """Coordinates game lifecycle, menu navigation, and history access."""
 
-    def __init__(self, history_repository: HistoryRepository):
+    def __init__(
+        self,
+        history_repository: HistoryRepository,
+        ghost_service: GhostService | None = None,
+    ):
         self.history_repository = history_repository
+        self.ghost_service = ghost_service
+        self.ghost_recorder = GhostRecorder()
+        # Ghost currently being raced; None outside of a race
+        self.active_ghost: GhostRun | None = None
         self.current_game: BaseGame | None = None
         self.selected_game_index = 0
 
@@ -77,13 +89,31 @@ class ApplicationRouter:
             return False
 
         self.current_game = game
+        self.ghost_recorder.reset()
+        self.active_ghost = None
         return True
 
     def process_game_input(self, input_text: str, is_complete: bool = False) -> bool:
         """Process input for the active game. Returns False when no game."""
         if not self.current_game:
             return False
-        result = self.current_game.process_input(input_text, is_complete)
+
+        game = self.current_game
+        already_finished = game.is_finished()
+        word_index_before = game.current_word_index
+
+        result = game.process_input(input_text, is_complete)
+
+        # Record phrase runs as input snapshots for ghost racing. Recording
+        # happens after processing so the run clock (start_time) exists.
+        if not already_finished and game.phrase_text is not None and game.start_time:
+            self.ghost_recorder.record(
+                elapsed_ms=int((time.time() - game.start_time) * 1000),
+                word_index=word_index_before,
+                value=input_text,
+                completed_word=game.current_word_index > word_index_before,
+            )
+
         return result.get("status") != "error"
 
     def finish_game(self) -> GameResult | None:
@@ -102,7 +132,15 @@ class ApplicationRouter:
             previous_best=best.wpm if best else None,
         )
 
-        self.history_repository.save(result)
+        history_id = self.history_repository.save(result)
+
+        if self.ghost_service is not None and self.ghost_service.should_auto_save(
+            result
+        ):
+            self.ghost_service.save_ghost(
+                result, self.ghost_recorder.recording, history_id
+            )
+
         return result
 
     def cancel_game(self) -> bool:
@@ -111,6 +149,7 @@ class ApplicationRouter:
             return False
         self.current_game.cancel()
         self.current_game = None
+        self.active_ghost = None
         return True
 
     def restart_game(self, keep_same_text: bool = False) -> bool:
@@ -124,6 +163,8 @@ class ApplicationRouter:
         """
         saved_words = None
         saved_phrase = None
+        # A restart on the same text keeps the race going; new text ends it
+        saved_ghost = self.active_ghost if keep_same_text else None
         if keep_same_text and self.current_game:
             saved_words = self.current_game.target_words.copy()
             saved_phrase = self.current_game.phrase_text
@@ -140,6 +181,7 @@ class ApplicationRouter:
         if saved_words and self.current_game:
             self.current_game.target_words = saved_words
             self.current_game.phrase_text = saved_phrase
+        self.active_ghost = saved_ghost
 
         return True
 
@@ -169,6 +211,7 @@ class ApplicationRouter:
             if not self.current_game.is_finished():
                 self.current_game.cancel()
             self.current_game = None
+        self.active_ghost = None
 
     def get_all_games(self, sort: Literal["asc", "desc"] = "desc") -> list[GameResult]:
         """Get all game results from history."""
