@@ -48,11 +48,12 @@ from termtypr.ui.stats_view import StatsView
 if TYPE_CHECKING:
     from termtypr.domain.models.game_result import GameResult
 
+# Keep these short: they must fit the Select field on one line
 GHOST_SAVE_MODE_LABELS = {
-    GhostSaveMode.AUTO_BEST: "Auto - save best run per phrase",
-    GhostSaveMode.AUTO_THRESHOLD: "Auto - save runs above WPM threshold",
-    GhostSaveMode.ALWAYS_ASK: "Ask after each phrase run",
-    GhostSaveMode.NEVER: "Never save ghosts",
+    GhostSaveMode.AUTO_BEST: "Auto: best per phrase",
+    GhostSaveMode.AUTO_THRESHOLD: "Auto: above threshold",
+    GhostSaveMode.ALWAYS_ASK: "Ask after each run",
+    GhostSaveMode.NEVER: "Never save",
 }
 
 
@@ -166,27 +167,34 @@ class GhostSettingsDialog(ModalScreen[dict | None]):
     }
 
     #ghost-settings-dialog {
-        width: 60;
+        width: 70;
         height: auto;
-        max-height: 26;
         border: thick $accent;
         background: $surface;
         padding: 1 2;
     }
 
-    #ghost-settings-dialog Label {
-        margin-top: 1;
+    #gs-title {
+        text-style: bold;
+        margin-bottom: 1;
     }
 
-    #gs-title {
-        margin-top: 0;
-        text-style: bold;
+    .gs-row {
+        height: 3;
+    }
+
+    .gs-row Label {
+        width: 28;
+        padding: 1 0;
+    }
+
+    .gs-row Input, .gs-row Select {
+        width: 1fr;
     }
 
     #gs-error {
         color: $error;
         height: 1;
-        margin-top: 1;
     }
 
     #gs-buttons {
@@ -202,39 +210,51 @@ class GhostSettingsDialog(ModalScreen[dict | None]):
     BINDINGS = [("escape", "cancel", "Cancel")]  # noqa
 
     def compose(self) -> ComposeResult:
-        """Create the dialog layout."""
+        """Create the dialog layout.
+
+        Label/field pairs sit side by side: the dialog must stay short
+        enough that the Save/Cancel buttons fit on a 24-line terminal.
+        """
         disk_estimate_kb = user_preferences.max_ghosts_total * GHOST_RUN_SIZE_KB
         with Vertical(id="ghost-settings-dialog"):
             yield Label("Ghost Racing Settings", id="gs-title")
-            yield Label("Save mode")
-            yield Select(
-                [(label, mode) for mode, label in GHOST_SAVE_MODE_LABELS.items()],
-                value=user_preferences.ghost_save_mode,
-                allow_blank=False,
-                id="gs-mode",
-            )
-            yield Label("WPM threshold (for threshold mode)")
-            yield Input(
-                value=f"{user_preferences.ghost_wpm_threshold:g}",
-                id="gs-threshold",
-                type="number",
-            )
-            yield Label("Minimum accuracy % for auto-saves")
-            yield Input(
-                value=f"{user_preferences.ghost_min_accuracy:g}",
-                id="gs-accuracy",
-                type="number",
-            )
-            yield Label(f"Max saved ghosts (currently ≈{disk_estimate_kb} KB max)")
-            yield Input(
-                value=str(user_preferences.max_ghosts_total),
-                id="gs-max",
-                type="integer",
-            )
+            with Horizontal(classes="gs-row"):
+                yield Label("Save mode")
+                yield Select(
+                    [(label, mode) for mode, label in GHOST_SAVE_MODE_LABELS.items()],
+                    value=user_preferences.ghost_save_mode,
+                    allow_blank=False,
+                    id="gs-mode",
+                )
+            with Horizontal(classes="gs-row"):
+                yield Label("WPM threshold (auto mode)")
+                yield Input(
+                    value=f"{user_preferences.ghost_wpm_threshold:g}",
+                    id="gs-threshold",
+                    type="number",
+                )
+            with Horizontal(classes="gs-row"):
+                yield Label("Min accuracy % (auto-save)")
+                yield Input(
+                    value=f"{user_preferences.ghost_min_accuracy:g}",
+                    id="gs-accuracy",
+                    type="number",
+                )
+            with Horizontal(classes="gs-row"):
+                yield Label(f"Max ghosts (≈{disk_estimate_kb} KB)")
+                yield Input(
+                    value=str(user_preferences.max_ghosts_total),
+                    id="gs-max",
+                    type="integer",
+                )
             yield Static("", id="gs-error")
             with Horizontal(id="gs-buttons"):
-                yield Button("OK", variant="primary", id="gs-ok")
+                yield Button("Save", variant="primary", id="gs-ok")
                 yield Button("Cancel", id="gs-cancel")
+
+    def on_mount(self) -> None:
+        """Focus the first field when the dialog is shown."""
+        self.query_one("#gs-mode", Select).focus()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Handle button presses for OK and Cancel."""
@@ -401,19 +421,19 @@ class TermTypr(App):
         margin: 0 1;
     }
 
+    #game-words-column {
+        width: 70%;
+        margin: 0 1 0 0;
+    }
+
     #ghost-words-view {
         height: auto;
-        max-height: 40%;
+        max-height: 50%;
         margin: 0 0 1 0;
     }
 
-    #game-main-row {
-        height: 1fr;
-    }
-
     #game-words-view {
-        width: 70%;
-        margin: 0 1 0 0;
+        height: auto;
     }
 
     #game-stats-view {

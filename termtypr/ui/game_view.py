@@ -144,7 +144,7 @@ class GhostWordsView(TypedWordsDisplay):
             self.styled_words_text(),
             title=title,
             border_style="magenta",
-            padding=(0, 2),
+            padding=(1, 2),
         )
 
 
@@ -229,12 +229,17 @@ class GameView(Container):
     """Main container for game display."""
 
     def compose(self) -> ComposeResult:
-        """Create child widgets for game view."""
-        with Vertical():
-            yield GhostWordsView(id="ghost-words-view")
-            with Horizontal(id="game-main-row"):
+        """Create child widgets for game view.
+
+        The ghost panel stacks above the player's words panel in one
+        column, so both share the same width; the stats panel spans the
+        full height on the right.
+        """
+        with Horizontal():
+            with Vertical(id="game-words-column"):
+                yield GhostWordsView(id="ghost-words-view")
                 yield GameWordsView(id="game-words-view")
-                yield GameStatsView(id="game-stats-view")
+            yield GameStatsView(id="game-stats-view")
 
     def on_mount(self) -> None:
         """Hide the ghost panel until a race starts."""
