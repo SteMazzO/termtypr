@@ -25,14 +25,20 @@ class TypedWordsDisplay(Static):
 
     def update_display_data(self, display_data: dict[str, Any]) -> None:
         """Update the display data from game or replay state."""
-        self.words = display_data.get("target_words", [])
+        new_words = display_data.get("target_words", [])
+        words_changed = new_words != self.words
+
+        self.words = new_words
         self.typed_words = display_data.get("typed_words", [])
         self.current_idx = display_data.get("current_word_index", 0)
         self.current_input = display_data.get("current_input", "")
 
-        self.refresh(layout=True)
-        if self.parent:
-            self.parent.refresh(layout=True)
+        if words_changed:
+            self.refresh(layout=True)
+            if self.parent:
+                self.parent.refresh(layout=True)
+        else:
+            self.refresh()
 
     def styled_words_text(self) -> Text:
         """Build the words as one styled Text based on typing state."""

@@ -30,6 +30,14 @@ class GhostRepository(ABC):
         """
 
     @abstractmethod
+    def exists(self, phrase_hash: str) -> bool:
+        """Check whether a phrase has a saved ghost, without loading it."""
+
+    @abstractmethod
+    def best_score_for_phrase(self, phrase_hash: str) -> float | None:
+        """Get the retention score of a phrase's saved ghost, if any."""
+
+    @abstractmethod
     def get_all(self) -> list["GhostRun"]:
         """Get all saved ghost runs, newest first."""
 

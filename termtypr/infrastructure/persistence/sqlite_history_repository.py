@@ -1,5 +1,6 @@
 """SQLite implementation of history repository."""
 
+import logging
 import sqlite3
 from datetime import datetime
 from pathlib import Path
@@ -9,6 +10,8 @@ from termtypr.config import DATABASE_FILE
 from termtypr.domain.history_repository import HistoryRepository
 from termtypr.domain.models.game_result import GameResult
 from termtypr.infrastructure.persistence import database
+
+logger = logging.getLogger(__name__)
 
 
 class SqliteHistoryRepository(HistoryRepository):
@@ -25,20 +28,24 @@ class SqliteHistoryRepository(HistoryRepository):
         self._conn = database.connect(self.db_path)
 
     @staticmethod
-    def _row_to_result(row: sqlite3.Row) -> GameResult:
+    def _row_to_result(row: sqlite3.Row) -> GameResult | None:
         """Build a GameResult from a game_history row."""
-        return GameResult(
-            wpm=row["wpm"],
-            raw_wpm=row["raw_wpm"],
-            accuracy=row["accuracy"],
-            duration=row["duration"],
-            game_type=row["game_type"],
-            timestamp=datetime.fromisoformat(row["timestamp"]),
-            total_characters=row["total_chars"],
-            correct_characters=row["correct_chars"],
-            error_count=row["error_count"],
-            phrase_text=row["phrase_text"],
-        )
+        try:
+            return GameResult(
+                wpm=row["wpm"],
+                raw_wpm=row["raw_wpm"],
+                accuracy=row["accuracy"],
+                duration=row["duration"],
+                game_type=row["game_type"],
+                timestamp=datetime.fromisoformat(row["timestamp"]),
+                total_characters=row["total_chars"],
+                correct_characters=row["correct_chars"],
+                error_count=row["error_count"],
+                phrase_text=row["phrase_text"],
+            )
+        except (ValueError, TypeError) as exc:
+            logger.warning("Skipping corrupt history row id=%s: %s", row["id"], exc)
+            return None
 
     def save(self, result: GameResult) -> int:
         """Save a game result to history.
@@ -81,14 +88,17 @@ class SqliteHistoryRepository(HistoryRepository):
         rows = self._conn.execute(
             f"SELECT * FROM game_history ORDER BY timestamp {order}"
         ).fetchall()
-        return [self._row_to_result(row) for row in rows]
+        results = (self._row_to_result(row) for row in rows)
+        return [result for result in results if result is not None]
 
     def get_best(self) -> GameResult | None:
         """Get the best game result based on WPM."""
-        row = self._conn.execute(
-            "SELECT * FROM game_history ORDER BY wpm DESC LIMIT 1"
-        ).fetchone()
-        return self._row_to_result(row) if row else None
+        # Lazy cursor: stops at the first row that parses cleanly
+        for row in self._conn.execute("SELECT * FROM game_history ORDER BY wpm DESC"):
+            result = self._row_to_result(row)
+            if result is not None:
+                return result
+        return None
 
     def clear(self) -> None:
         """Clear all history."""

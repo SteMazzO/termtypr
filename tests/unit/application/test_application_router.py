@@ -561,6 +561,40 @@ class TestGhostRaceEntryPoints:
 
         assert ghost_router.has_ghost_for_current_phrase() is True
 
+    def test_last_ghost_saved_reflects_auto_save(self, ghost_router):
+        """The router reports when a finished run became the phrase's ghost."""
+        ghost_router.select_game(1)
+        ghost_router.start_game()
+        assert ghost_router.last_ghost_saved is False
+
+        self._finish_phrase_run(ghost_router)  # AUTO_BEST saves it
+
+        assert ghost_router.last_ghost_saved is True
+
+        # An equal rematch run does not replace the ghost
+        assert ghost_router.start_ghost_rematch() is True
+        self._finish_phrase_run(ghost_router)
+        assert ghost_router.last_ghost_saved is False
+
+    def test_race_restart_same_text_survives_ghost_deletion(
+        self, ghost_router, ghost_service
+    ):
+        """A same-text race restart reuses the in-hand ghost, not the DB."""
+        ghost_router.select_game(1)
+        ghost_router.start_game()
+        self._finish_phrase_run(ghost_router)
+
+        ghost_router.select_game(self.RACE_GAME_INDEX)
+        assert ghost_router.start_game() is True
+        racing = ghost_router.active_ghost
+
+        # The ghost disappears from the repo mid-race (Manage Ghosts)
+        ghost_service.repository.delete(racing.id)
+
+        assert ghost_router.restart_game(keep_same_text=True) is True
+        assert ghost_router.active_ghost is racing
+        assert ghost_router.current_game.phrase_text == racing.phrase_text
+
     def test_finishing_a_race_produces_an_outcome(self, ghost_router):
         """Finishing while racing records the outcome and ends the race."""
         ghost_router.select_game(1)
@@ -590,6 +624,7 @@ class TestGhostRaceEntryPoints:
 
         assert ghost_service.get_ghost_for_phrase(result.phrase_hash) is not None
         assert ghost_router.has_pending_ghost_save() is False
+        assert ghost_router.last_ghost_saved is True
         assert ghost_router.save_pending_ghost() is False
 
     def test_pending_save_discarded_on_new_game(self, ghost_router):

@@ -157,3 +157,45 @@ def test_history_link_nulled_when_history_cleared(tmp_path):
 
     history_repo.close()
     ghost_repo.close()
+
+
+def test_exists(repo):
+    """Existence check works without loading the recording."""
+    assert repo.exists(phrase_hash("hi there")) is False
+
+    repo.save(make_ghost())
+
+    assert repo.exists(phrase_hash("hi there")) is True
+
+
+def test_best_score_for_phrase(repo):
+    """The saved ghost's retention score is returned without the recording."""
+    assert repo.best_score_for_phrase(phrase_hash("hi there")) is None
+
+    repo.save(make_ghost(wpm=60.0, accuracy=95.0))
+
+    assert repo.best_score_for_phrase(phrase_hash("hi there")) == 60.0 * 95.0
+
+
+def test_corrupt_rows_are_skipped(repo):
+    """Ghost rows with bad recordings are dropped instead of crashing."""
+    repo.save(make_ghost(phrase="good one"))
+    repo._conn.execute(
+        """
+        INSERT INTO ghost_runs (
+            phrase_hash, phrase_text, wpm, accuracy, duration,
+            recording, timestamp
+        ) VALUES ('deadbeef', 'bad one', 50.0, 90.0, 10.0,
+                  '{broken json', '2026-01-15T12:00:00+00:00')
+        """
+    )
+    repo._conn.commit()
+
+    ghosts = repo.get_all()
+    assert [g.phrase_text for g in ghosts] == ["good one"]
+
+    random_ghost = repo.get_random()
+    assert random_ghost is not None
+    assert random_ghost.phrase_text == "good one"
+
+    assert repo.get_by_phrase_hash("deadbeef") is None

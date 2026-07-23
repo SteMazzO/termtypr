@@ -142,10 +142,10 @@ class TestSaveGhost:
         result = make_result()
         history_id = history_repo.save(result)
 
-        ghost = service.save_ghost(result, RECORDING, history_id=history_id)
+        ghost_id = service.save_ghost(result, RECORDING, history_id=history_id)
 
-        assert ghost.id is not None
         stored = repository.get_by_phrase_hash(result.phrase_hash)
+        assert stored.id == ghost_id
         assert stored.wpm == result.wpm
         assert stored.recording == RECORDING
         assert stored.game_history_id == history_id

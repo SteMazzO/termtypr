@@ -1,11 +1,9 @@
 """Ghost save conditions and persistence coordination."""
 
-from dataclasses import replace
-
 from termtypr.config import user_preferences
 from termtypr.domain.ghost_repository import GhostRepository
 from termtypr.domain.models.game_result import GameResult
-from termtypr.domain.models.ghost_run import GhostRun, RecordingEvent
+from termtypr.domain.models.ghost_run import GhostRun, RecordingEvent, ghost_score
 from termtypr.domain.models.user_preferences import GhostSaveMode
 
 
@@ -18,6 +16,10 @@ class GhostService:
     def get_ghost_for_phrase(self, phrase_hash: str) -> GhostRun | None:
         """Get the saved ghost for a phrase, if any."""
         return self.repository.get_by_phrase_hash(phrase_hash)
+
+    def has_ghost_for_phrase(self, phrase_hash: str) -> bool:
+        """Check whether a phrase has a saved ghost (no recording load)."""
+        return self.repository.exists(phrase_hash)
 
     def get_random_ghost(self) -> GhostRun | None:
         """Get a random saved ghost, or None when there are none."""
@@ -60,16 +62,23 @@ class GhostService:
         ):
             return False
 
-        existing = self.repository.get_by_phrase_hash(result.phrase_hash)
-        return existing is None or result.wpm * result.accuracy > existing.score
+        existing_score = self.repository.best_score_for_phrase(result.phrase_hash)
+        return (
+            existing_score is None
+            or ghost_score(result.wpm, result.accuracy) > existing_score
+        )
 
     def save_ghost(
         self,
         result: GameResult,
         recording: tuple[RecordingEvent, ...],
         history_id: int | None = None,
-    ) -> GhostRun:
-        """Persist a run as the ghost for its phrase and enforce the cap."""
+    ) -> int:
+        """Persist a run as the ghost for its phrase and enforce the cap.
+
+        Returns:
+            The stored ghost's repository id.
+        """
         if result.phrase_text is None:
             raise ValueError("Only phrase runs can be saved as ghosts")
 
@@ -84,4 +93,4 @@ class GhostService:
         )
         ghost_id = self.repository.save(ghost)
         self.repository.prune(user_preferences.max_ghosts_total)
-        return replace(ghost, id=ghost_id)
+        return ghost_id

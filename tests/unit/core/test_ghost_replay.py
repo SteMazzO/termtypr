@@ -93,7 +93,8 @@ def test_replay_is_deterministic(ghost):
 
 def test_display_data_shape(ghost):
     """display_data matches what the game words view consumes."""
-    data = GhostReplay(ghost).display_data(450)
+    replay = GhostReplay(ghost)
+    data = replay.display_data(replay.state_at(450))
 
     assert data == {
         "target_words": ["hi", "there"],
@@ -113,3 +114,26 @@ def test_time_to_reach_chars(ghost):
     assert replay.time_to_reach_chars(3) == 500  # "hi" + "t"
     assert replay.time_to_reach_chars(7) == 900  # "hi" + "there"
     assert replay.time_to_reach_chars(8) is None  # never typed this far
+
+
+def test_time_to_reach_chars_caps_overtyped_input():
+    """Over-typed input counts at most the target word's length."""
+    recording = (
+        RecordingEvent(t=0, w=0, v="h"),
+        RecordingEvent(t=100, w=0, v="hiiiiiii"),  # over-typed: still 2 chars
+        RecordingEvent(t=200, w=0, v="hi", s=True),
+        RecordingEvent(t=300, w=1, v="the"),
+    )
+    ghost = GhostRun(
+        phrase_text="hi there",
+        wpm=48.0,
+        accuracy=90.0,
+        duration=0.3,
+        recording=recording,
+        timestamp=datetime.now(tz=timezone.utc),
+    )
+    replay = GhostReplay(ghost)
+
+    assert replay.time_to_reach_chars(2) == 100  # capped at len("hi")
+    assert replay.time_to_reach_chars(3) == 300  # needs word 1 progress
+    assert replay.time_to_reach_chars(6) is None  # never covered this much

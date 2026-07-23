@@ -6,6 +6,15 @@ from datetime import datetime
 from termtypr.core.phrase_hash import phrase_hash
 
 
+def ghost_score(wpm: float, accuracy: float) -> float:
+    """Ranking score used for all ghost retention decisions.
+
+    The single definition: repositories and services must call this
+    instead of re-deriving the formula.
+    """
+    return wpm * accuracy
+
+
 @dataclass(frozen=True)
 class RecordingEvent:
     """One input-state snapshot of a typing run.
@@ -49,7 +58,7 @@ class GhostRun:
     @property
     def score(self) -> float:
         """Ranking score used for retention decisions."""
-        return self.wpm * self.accuracy
+        return ghost_score(self.wpm, self.accuracy)
 
 
 @dataclass(frozen=True)

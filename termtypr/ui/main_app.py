@@ -463,6 +463,7 @@ class TermTypr(App):
         self._best_wpm: float = 0.0
         self._ghost_timer = None
         self._ghost_replay: GhostReplay | None = None
+        self._last_ghost_frame: tuple | None = None
 
     def compose(self) -> ComposeResult:
         """Create child widgets."""
@@ -561,6 +562,7 @@ class TermTypr(App):
             race_outcome=self.router.last_race_outcome,
             can_race_ghost=can_race_ghost,
             ghost_save_pending=ghost_save_pending,
+            ghost_saved=self.router.last_ghost_saved,
         )
 
         placeholder = "Press ENTER to play again"
@@ -619,6 +621,8 @@ class TermTypr(App):
         self.query_one(Input).value = ""
         if self.router.start_ghost_rematch():
             self._begin_game_session()
+        else:
+            self.notify("No ghost saved for this phrase", severity="warning")
 
     def _save_pending_ghost(self) -> None:
         """Save the finished run as a ghost when a decision is pending."""
@@ -783,42 +787,50 @@ class TermTypr(App):
             self._ghost_timer.stop()
             self._ghost_timer = None
         self._ghost_replay = None
-
-    def _player_elapsed(self) -> float:
-        """Seconds since the player's first keystroke (0.0 before it)."""
-        game = self.router.current_game
-        if game is None or not game.start_time:
-            return 0.0
-        return time.time() - game.start_time
+        self._last_ghost_frame = None
 
     def _update_ghost_display(self) -> None:
         """Advance the ghost replay to the player's elapsed time."""
         if self._ghost_replay is None:
             return
+        game = self.router.current_game
+        if game is None:
+            return
 
-        elapsed_ms = int(self._player_elapsed() * 1000)
-        finished_in = None
-        if self._ghost_replay.state_at(elapsed_ms).finished:
-            finished_in = self._ghost_replay.ghost.duration
+        # Before the player's first keystroke the race hasn't started:
+        # freeze the replay before its t=0 event so nothing is revealed.
+        elapsed = game.elapsed_seconds()
+        elapsed_ms = -1 if elapsed is None else int(elapsed * 1000)
 
+        state = self._ghost_replay.state_at(elapsed_ms)
+        frame = (state.word_index, state.current_input, state.finished)
+        if frame == self._last_ghost_frame:
+            # Nothing moved since the last tick; skip the re-render
+            return
+        self._last_ghost_frame = frame
+
+        finished_in = self._ghost_replay.ghost.duration if state.finished else None
         self.query_one(GameView).update_ghost_display(
-            self._ghost_replay.display_data(elapsed_ms), finished_in
+            self._ghost_replay.display_data(state), finished_in
         )
 
-    def _ghost_delta_seconds(self, stats: dict) -> float | None:
+    def _ghost_delta_seconds(self) -> float | None:
         """Seconds the player is behind (positive) or ahead of the ghost."""
         if self._ghost_replay is None:
             return None
-
-        elapsed = self._player_elapsed()
-        if elapsed <= 0:
+        game = self.router.current_game
+        if game is None:
             return None
 
-        ghost_ms = self._ghost_replay.time_to_reach_chars(
-            stats.get("characters_typed", 0)
-        )
+        elapsed = game.elapsed_seconds()
+        if elapsed is None:
+            return None
+
+        # Capped progress on both sides keeps the comparison fair even
+        # when either typist over-typed a word
+        ghost_ms = self._ghost_replay.time_to_reach_chars(game.progress_chars())
         if ghost_ms is None:
-            # The ghost never typed this far; compare against its full run
+            # The ghost never covered this much; compare against its full run
             ghost_ms = int(self._ghost_replay.ghost.duration * 1000)
         return elapsed - ghost_ms / 1000
 
@@ -853,7 +865,7 @@ class TermTypr(App):
             return
 
         self.query_one(GameView).update_game_stats(
-            stats, self._best_wpm, self._ghost_delta_seconds(stats)
+            stats, self._best_wpm, self._ghost_delta_seconds()
         )
 
     def _finish_current_game(self) -> None:
@@ -875,6 +887,12 @@ class TermTypr(App):
         """
         if self.router.restart_game(keep_same_text=keep_same_text):
             self._begin_game_session()
+            return
+
+        # e.g. Race a Ghost when every ghost was deleted mid-session:
+        # don't leave stale timers running against a dead game view
+        self.notify("Could not restart the game", severity="warning")
+        self.action_main_menu()
 
     def _show_stats(self) -> None:
         """Show the statistics view with typing test records."""
@@ -944,9 +962,33 @@ class TermTypr(App):
             self.action_quit,
         )
 
+    def _push_screen_pausing_run(self, screen: ModalScreen, callback=None) -> None:
+        """Push a modal, pausing an active run's clock while it is open.
+
+        Shifting start_time forward by the modal's lifetime pauses
+        everything derived from the run clock at once: WPM stats, the
+        ghost replay, the delta line, and recording timestamps.
+        """
+        game = self.router.current_game
+        pause_started = (
+            time.time()
+            if self.current_view == "game" and game is not None and game.start_time
+            else None
+        )
+
+        def _dismissed(result=None) -> None:
+            if pause_started is not None and self.router.current_game is game:
+                game.start_time += time.time() - pause_started
+            if callback is not None:
+                callback(result)
+
+        self.push_screen(screen, callback=_dismissed)
+
     def _open_word_count_dialog(self) -> None:
         """Open the word-count modal and apply the result."""
-        self.push_screen(WordCountDialog(), callback=self._on_word_count_result)
+        self._push_screen_pausing_run(
+            WordCountDialog(), callback=self._on_word_count_result
+        )
 
     def _on_word_count_result(self, value: int | None) -> None:
         """Callback when the word-count dialog is dismissed."""
@@ -958,12 +1000,14 @@ class TermTypr(App):
 
     def _open_ghost_settings_dialog(self) -> None:
         """Open the ghost-settings modal and apply the result."""
-        self.push_screen(GhostSettingsDialog(), callback=self._on_ghost_settings_result)
+        self._push_screen_pausing_run(
+            GhostSettingsDialog(), callback=self._on_ghost_settings_result
+        )
 
     def _open_ghost_manager(self) -> None:
         """Open the saved-ghosts list modal."""
         if self.router.ghost_service is not None:
-            self.push_screen(GhostManagerDialog(self.router.ghost_service))
+            self._push_screen_pausing_run(GhostManagerDialog(self.router.ghost_service))
 
     def _on_ghost_settings_result(self, values: dict | None) -> None:
         """Callback when the ghost-settings dialog is dismissed."""

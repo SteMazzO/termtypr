@@ -9,12 +9,11 @@ Practice your typing right in the terminal. Track your speed, see where you impr
 
 ## What it does
 
-- **Three game modes** - random words, full phrases, or racing your own ghosts
-- **Ghost racing** - replay your best phrase runs keystroke by keystroke and race against them
-- **Live feedback** - WPM and accuracy update as you type
-- **Stats & charts** - see your history, personal bests, and trends over time
-- **Customizable** - set the word count per game, switch themes, add your own words
-- **Runs anywhere** - works on any terminal with Python 3.10+
+- **Three game modes**: random words, full phrases, or racing your own ghosts
+- **Live feedback**: WPM and accuracy update as you type
+- **Stats & charts**: see your history, personal bests, and trends over time
+- **Customizable**: set the word count per game, switch themes, add your own words
+- **Runs anywhere**: works on any terminal with Python 3.10+
 
 ## Install and run
 
@@ -25,23 +24,14 @@ termtypr
 
 That's it. The main menu lets you pick a game mode and start typing.
 
-## Ghost racing
+## Games
 
-Finish a phrase run and TermTypr can save it as a **ghost** - a full replay of your
-typing, corrections included. Race it two ways:
+- **Random Words**: type a batch of random words as fast and accurately as you can
+- **Phrase Typing**: type full phrases and quotes to build flow
+- **Race a Ghost**: race a keystroke-perfect replay of one of your best runs
 
-- **Instant rematch** - press `R` on the results screen to race the saved ghost of the
-  phrase you just typed
-- **Race a Ghost** - the menu mode picks one of your saved ghosts and races its phrase
-
-During a race the ghost types in its own panel above yours, and the stats panel shows
-how far ahead or behind you are. The race clock starts on your first keystroke, so take
-your time getting ready.
-
-By default the best run per phrase is saved automatically (up to a global cap, worst
-runs pruned first). The command palette (`Ctrl+P`) has **Ghost Settings** for the save
-mode - always ask, never, auto-best, or above a WPM threshold - and **Manage Ghosts**
-to list and delete saved runs.
+Your best phrase runs are saved as **ghosts** automatically (change that in
+**Ghost Settings**, `Ctrl+P`). Press `R` on a phrase result to rematch its ghost.
 
 ## CLI commands
 
@@ -59,15 +49,13 @@ termtypr list-words             # See all available words
 ```bash
 git clone https://github.com/SteMazzO/termtypr.git
 cd termtypr
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -e ".[dev]"
+uv run termtypr
 ```
 
 ### Run Tests
 
 ```bash
-pytest tests/ -v
+uv run pytest -v
 ```
 
 ## Contributing

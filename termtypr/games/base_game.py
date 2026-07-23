@@ -77,6 +77,32 @@ class BaseGame(ABC):
         self.status = GameStatus.CANCELLED
         self.result = None
 
+    def elapsed_seconds(self) -> float | None:
+        """Seconds since the run's first keystroke, or None before it.
+
+        The single run clock: recording timestamps and replay playback
+        must both derive from this so they can never drift apart.
+        """
+        if not self.start_time:
+            return None
+        return time.time() - self.start_time
+
+    def progress_chars(self) -> int:
+        """Characters of the target covered so far, capped per word.
+
+        Unlike raw typed-character counts, over-typing a word cannot
+        inflate this past the target's length, so it is a comparable
+        progress metric between a player and a ghost.
+        """
+        covered = 0
+        for i, typed in enumerate(self.typed_words[: self.current_word_index]):
+            if i < len(self.target_words):
+                covered += min(len(typed), len(self.target_words[i]))
+        if self.current_word_index < len(self.target_words):
+            target = self.target_words[self.current_word_index]
+            covered += min(len(self.current_input), len(target))
+        return covered
+
     def is_finished(self) -> bool:
         """Check if the game is finished (completed or cancelled)."""
         return self.status in [GameStatus.COMPLETED, GameStatus.CANCELLED]

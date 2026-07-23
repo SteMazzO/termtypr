@@ -26,9 +26,16 @@ class PhraseTypingGame(BaseGame):
         if self.status != GameStatus.READY:
             return False
 
-        phrase = get_random_phrase()
-        self.target_words = phrase.split()
         self._reset_state()
-        self.phrase_text = phrase
+        self.set_phrase(get_random_phrase())
         self.status = GameStatus.READY
         return True
+
+    def set_phrase(self, phrase: str) -> None:
+        """Replace the target phrase (used by rematches and ghost races).
+
+        Any state derived from the phrase must be set here, so content
+        injected from outside can never diverge from the drawn phrase.
+        """
+        self.target_words = phrase.split()
+        self.phrase_text = phrase

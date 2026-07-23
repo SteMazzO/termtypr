@@ -138,3 +138,24 @@ def test_creates_missing_data_directory(tmp_path):
     assert db_path.exists()
     assert len(repo.get_all()) == 1
     repo.close()
+
+
+def test_corrupt_rows_are_skipped(repo):
+    """Unparseable rows are dropped with a warning; valid ones still load."""
+    repo.save(make_result(wpm=50.0))
+    repo._conn.execute(
+        """
+        INSERT INTO game_history (
+            game_type, wpm, raw_wpm, accuracy, duration, timestamp
+        ) VALUES ('Random Words', 99.0, 99.0, 95.0, 60.0, 'not-a-date')
+        """
+    )
+    repo._conn.commit()
+
+    results = repo.get_all()
+    assert len(results) == 1
+    assert results[0].wpm == 50.0
+
+    best = repo.get_best()
+    assert best is not None
+    assert best.wpm == 50.0  # the corrupt 99-WPM row is skipped

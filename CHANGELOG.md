@@ -9,17 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Ghost racing**: phrase runs are recorded as input snapshots and can be saved as
-  "ghosts" - full replays you can race against
-  - **Race a Ghost** game mode: races the phrase of a randomly picked saved ghost
-  - **Instant rematch**: press `R` on the results screen to race the ghost of the
-    phrase just typed; `S` saves the run when the save mode is "ask"
-  - Ghost replay panel above the words view, live ahead/behind delta in the stats
-    panel, and win/loss outcome on the results screen
-  - Configurable save conditions (**Ghost Settings** in the command palette):
-    always ask, never, auto-save best per phrase (default), or auto-save above a WPM
-    threshold - plus a minimum-accuracy floor and a global cap with worst-run pruning
-  - **Manage Ghosts** dialog in the command palette to list and delete saved runs
+- **Ghost racing**: save a phrase run as a "ghost", a full replay of your typing,
+  corrections included, and race against it
+  - **Race a Ghost** menu mode picks one of your saved ghosts, or press `R` on the
+    results screen to instantly rematch the phrase you just typed
+  - Results end with a You-vs-Ghost comparison of time, WPM, and accuracy
 
 ### Changed
 

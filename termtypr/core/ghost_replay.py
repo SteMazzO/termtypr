@@ -54,9 +54,8 @@ class GhostReplay:
             finished=word_index >= len(self.target_words),
         )
 
-    def display_data(self, elapsed_ms: int) -> dict[str, Any]:
+    def display_data(self, state: GhostReplayState) -> dict[str, Any]:
         """Build display data in the same shape the game views consume."""
-        state = self.state_at(elapsed_ms)
         return {
             "target_words": self.target_words,
             "typed_words": state.typed_words,
@@ -64,21 +63,29 @@ class GhostReplay:
             "current_input": state.current_input,
         }
 
-    def time_to_reach_chars(self, char_count: int) -> int | None:
-        """Milliseconds the ghost needed to have typed char_count characters.
+    def _covered_chars(self, event_word: int, value: str) -> int:
+        """Target characters an input value covers, capped at its word."""
+        if event_word >= len(self.target_words):
+            return 0
+        return min(len(value), len(self.target_words[event_word]))
 
-        Progress counts completed words plus the in-progress input, the
-        same metric the live stats use. Returns None when the ghost never
-        typed that many characters.
+    def time_to_reach_chars(self, char_count: int) -> int | None:
+        """Milliseconds the ghost needed to cover char_count target chars.
+
+        Progress counts completed words plus the in-progress input,
+        capped per word (matching BaseGame.progress_chars), so over-typed
+        input never inflates either side of a race comparison. Returns
+        None when the ghost never covered that many characters.
         """
         if char_count <= 0:
             return 0
 
         completed_chars = 0
         for event in self.ghost.recording:
-            if completed_chars + len(event.v) >= char_count:
+            covered = self._covered_chars(event.w, event.v)
+            if completed_chars + covered >= char_count:
                 return event.t
             if event.s:
-                completed_chars += len(event.v)
+                completed_chars += covered
 
         return None

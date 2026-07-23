@@ -3,7 +3,6 @@
 coordinates game lifecycle, menu, history, and ghost racing.
 """
 
-import time
 from dataclasses import replace
 from typing import Any, Literal
 
@@ -51,6 +50,8 @@ class ApplicationRouter:
         self.active_ghost: GhostRun | None = None
         # Outcome of the last finished race, for the results view
         self.last_race_outcome: RaceOutcome | None = None
+        # True when the last finished run was saved as its phrase's ghost
+        self.last_ghost_saved = False
         # Finished run awaiting the user's save decision (ALWAYS_ASK mode)
         self._pending_ghost_save: (
             tuple[GameResult, tuple[RecordingEvent, ...], int | None] | None
@@ -83,8 +84,18 @@ class ApplicationRouter:
         n = len(AVAILABLE_GAMES)
         self.selected_game_index = (self.selected_game_index + direction) % n
 
-    def start_game(self, config: dict[str, Any] | None = None) -> bool:
-        """Start the currently selected game."""
+    def start_game(
+        self,
+        config: dict[str, Any] | None = None,
+        ghost: GhostRun | None = None,
+    ) -> bool:
+        """Start the currently selected game.
+
+        Args:
+            config: Game-specific configuration.
+            ghost: In race mode, race this ghost instead of drawing a
+                random one (used by same-text restarts).
+        """
         if not 0 <= self.selected_game_index < len(AVAILABLE_GAMES):
             return False
 
@@ -104,25 +115,27 @@ class ApplicationRouter:
         self.ghost_recorder.reset()
         self.active_ghost = None
         self._pending_ghost_save = None
+        self.last_ghost_saved = False
 
-        if isinstance(game, GhostRaceGame) and not self._enter_ghost_race(game):
+        if isinstance(game, GhostRaceGame) and not self._enter_ghost_race(game, ghost):
             self.current_game = None
             return False
 
         return True
 
-    def _enter_ghost_race(self, game: GhostRaceGame) -> bool:
-        """Point a race-mode game at a random saved ghost's phrase."""
-        ghost = (
-            self.ghost_service.get_random_ghost()
-            if self.ghost_service is not None
-            else None
-        )
+    def _enter_ghost_race(
+        self, game: GhostRaceGame, ghost: GhostRun | None = None
+    ) -> bool:
+        """Point a race-mode game at a saved ghost's phrase.
+
+        Draws a random ghost when none is given.
+        """
+        if ghost is None and self.ghost_service is not None:
+            ghost = self.ghost_service.get_random_ghost()
         if ghost is None:
             return False
 
-        game.target_words = ghost.phrase_text.split()
-        game.phrase_text = ghost.phrase_text
+        game.set_phrase(ghost.phrase_text)
         self.active_ghost = ghost
         return True
 
@@ -139,9 +152,14 @@ class ApplicationRouter:
 
         # Record phrase runs as input snapshots for ghost racing. Recording
         # happens after processing so the run clock (start_time) exists.
-        if not already_finished and game.phrase_text is not None and game.start_time:
+        elapsed = game.elapsed_seconds()
+        if (
+            not already_finished
+            and game.phrase_text is not None
+            and elapsed is not None
+        ):
             self.ghost_recorder.record(
-                elapsed_ms=int((time.time() - game.start_time) * 1000),
+                elapsed_ms=int(elapsed * 1000),
                 word_index=word_index_before,
                 value=input_text,
                 completed_word=game.current_word_index > word_index_before,
@@ -180,6 +198,7 @@ class ApplicationRouter:
                 self.ghost_service.save_ghost(
                     result, self.ghost_recorder.recording, history_id
                 )
+                self.last_ghost_saved = True
             elif self.ghost_service.should_prompt(result):
                 self._pending_ghost_save = (
                     result,
@@ -205,6 +224,7 @@ class ApplicationRouter:
         result, recording, history_id = self._pending_ghost_save
         self.ghost_service.save_ghost(result, recording, history_id)
         self._pending_ghost_save = None
+        self.last_ghost_saved = True
         return True
 
     def has_ghost_for_current_phrase(self) -> bool:
@@ -214,10 +234,7 @@ class ApplicationRouter:
         phrase_text = self.current_game.phrase_text
         if phrase_text is None:
             return False
-        return (
-            self.ghost_service.get_ghost_for_phrase(phrase_hash(phrase_text))
-            is not None
-        )
+        return self.ghost_service.has_ghost_for_phrase(phrase_hash(phrase_text))
 
     def start_ghost_rematch(self) -> bool:
         """Restart the finished phrase as a race against its saved ghost.
@@ -274,7 +291,9 @@ class ApplicationRouter:
                 self.current_game.cancel()
             self.current_game = None
 
-        if not self.start_game():
+        # Passing the saved ghost means a same-text race restart reuses it
+        # instead of drawing (and possibly failing to find) a random one
+        if not self.start_game(ghost=saved_ghost):
             return False
 
         if saved_words and self.current_game:
