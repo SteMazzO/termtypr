@@ -11,11 +11,15 @@ class HistoryRepository(ABC):
     """Abstract repository for managing typing test history."""
 
     @abstractmethod
-    def save(self, result: "GameResult") -> None:
+    def save(self, result: "GameResult") -> int | None:
         """Save a game result to history.
 
         Args:
             result: The game result to save
+
+        Returns:
+            An implementation-specific identifier for the stored record,
+            or None when the backend has no meaningful identifier.
         """
 
     @abstractmethod

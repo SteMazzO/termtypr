@@ -9,11 +9,11 @@ Practice your typing right in the terminal. Track your speed, see where you impr
 
 ## What it does
 
-- **Two game modes** — random words or full phrases
-- **Live feedback** — WPM and accuracy update as you type
-- **Stats & charts** — see your history, personal bests, and trends over time
-- **Customizable** — set the word count per game, switch themes, add your own words
-- **Runs anywhere** — works on any terminal with Python 3.10+
+- **Three game modes**: random words, full phrases, or racing your own ghosts
+- **Live feedback**: WPM and accuracy update as you type
+- **Stats & charts**: see your history, personal bests, and trends over time
+- **Customizable**: set the word count per game, switch themes, add your own words
+- **Runs anywhere**: works on any terminal with Python 3.10+
 
 ## Install and run
 
@@ -23,6 +23,15 @@ termtypr
 ```
 
 That's it. The main menu lets you pick a game mode and start typing.
+
+## Games
+
+- **Random Words**: type a batch of random words as fast and accurately as you can
+- **Phrase Typing**: type full phrases and quotes to build flow
+- **Race a Ghost**: race a keystroke-perfect replay of one of your best runs
+
+Your best phrase runs are saved as **ghosts** automatically (change that in
+**Ghost Settings**, `Ctrl+P`). Press `R` on a phrase result to rematch its ghost.
 
 ## CLI commands
 
@@ -40,20 +49,18 @@ termtypr list-words             # See all available words
 ```bash
 git clone https://github.com/SteMazzO/termtypr.git
 cd termtypr
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -e ".[dev]"
+uv run termtypr
 ```
 
 ### Run Tests
 
 ```bash
-pytest tests/ -v
+uv run pytest -v
 ```
 
 ## Contributing
 
-Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
+Contributions are welcome - see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 

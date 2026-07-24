@@ -21,27 +21,25 @@ All types of contributions are encouraged and valued. Please make sure to read t
 
 ### Development Environment
 
+The project uses [uv](https://docs.astral.sh/uv/):
+
 1. Fork the repository
 2. Clone your fork: `git clone https://github.com/YOUR-USERNAME/termtypr.git`
-3. Set up a virtual environment: `python -m venv venv`
-4. Activate the virtual environment:
-   - Windows: `venv\Scripts\activate`
-   - Unix/MacOS: `source venv/bin/activate`
-5. Install development dependencies: `pip install -e ".[dev]"`
-6. Install pre-commit hooks: `pre-commit install`
+3. Install the environment (including dev dependencies): `uv sync`
+4. Install pre-commit hooks: `uv run pre-commit install`
 
 ### Running Tests
 
 We use pytest for testing. To run all tests:
 
 ```bash
-pytest
+uv run pytest
 ```
 
 To run tests with coverage:
 
 ```bash
-pytest --cov=termtypr
+uv run pytest --cov=termtypr
 ```
 
 ### Reporting Bugs

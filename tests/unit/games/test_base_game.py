@@ -154,3 +154,37 @@ class TestFinish:
         result = game.finish()
 
         assert result.wpm < result.raw_wpm
+
+
+class TestRunClockAndProgress:
+    """Tests for elapsed_seconds and progress_chars."""
+
+    def test_elapsed_seconds_none_before_first_keystroke(self, game):
+        """The run clock does not exist until the first input."""
+        assert game.elapsed_seconds() is None
+
+        game.process_input("h", is_complete_input=False)
+
+        elapsed = game.elapsed_seconds()
+        assert elapsed is not None
+        assert elapsed >= 0
+
+    def test_progress_chars_counts_covered_target(self, game):
+        """Completed words and the current input count toward progress."""
+        game.process_input("hello", is_complete_input=True)
+        game.process_input("wor", is_complete_input=False)
+
+        assert game.progress_chars() == 8  # "hello" + "wor"
+
+    def test_progress_chars_capped_by_target_length(self, game):
+        """Over-typing a word cannot inflate progress past the target."""
+        game.process_input("helloooooo", is_complete_input=False)
+
+        assert game.progress_chars() == 5  # capped at len("hello")
+
+    def test_progress_chars_zero_after_clearing_input(self, game):
+        """Backspacing to empty input drops progress back to zero."""
+        game.process_input("hel", is_complete_input=False)
+        game.process_input("", is_complete_input=False)
+
+        assert game.progress_chars() == 0

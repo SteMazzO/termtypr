@@ -5,12 +5,19 @@ from datetime import datetime, timezone
 import pytest
 
 from termtypr.application.application_router import AVAILABLE_GAMES, ApplicationRouter
+from termtypr.application.ghost_service import GhostService
 from termtypr.config import user_preferences
 from termtypr.domain.models.game_result import GameResult
-from termtypr.domain.models.user_preferences import DEFAULT_WORD_COUNT
+from termtypr.domain.models.user_preferences import DEFAULT_WORD_COUNT, UserPreferences
 from termtypr.games.base_game import GameStatus
 from termtypr.infrastructure.persistence.memory_history_repository import (
     InMemoryHistoryRepository,
+)
+from termtypr.infrastructure.persistence.sqlite_ghost_repository import (
+    SqliteGhostRepository,
+)
+from termtypr.infrastructure.persistence.sqlite_history_repository import (
+    SqliteHistoryRepository,
 )
 
 
@@ -23,10 +30,13 @@ def repository():
 @pytest.fixture(autouse=True)
 def _reset_preferences():
     """Ensure user_preferences has deterministic defaults for every test."""
-    original = user_preferences.word_count
-    user_preferences.word_count = DEFAULT_WORD_COUNT
+    defaults = UserPreferences()
+    saved = user_preferences.model_dump()
+    for key in saved:
+        setattr(user_preferences, key, getattr(defaults, key))
     yield
-    user_preferences.word_count = original
+    for key, value in saved.items():
+        setattr(user_preferences, key, value)
 
 
 @pytest.fixture
@@ -71,9 +81,10 @@ class TestRouterInitialization:
 
     def test_available_games_loaded(self, router):
         """Test available games are loaded."""
-        assert len(AVAILABLE_GAMES) == 2
+        assert len(AVAILABLE_GAMES) == 3
         assert AVAILABLE_GAMES[0]["name"] == "RandomWordsGame"
         assert AVAILABLE_GAMES[1]["name"] == "PhraseTypingGame"
+        assert AVAILABLE_GAMES[2]["name"] == "GhostRaceGame"
 
 
 class TestGameSelection:
@@ -83,7 +94,7 @@ class TestGameSelection:
         """Test getting available games list."""
         games = router.get_available_games()
 
-        assert len(games) == 2
+        assert len(games) == 3
         assert games[0]["name"] == "RandomWordsGame"
         assert games[0]["display_name"] == "Random Words"
         assert games[0]["is_selected"] is True
@@ -118,7 +129,7 @@ class TestGameSelection:
 
     def test_navigate_game_selection_wraps(self, router):
         """Test game selection wraps around."""
-        router.select_game(1)  # Last game
+        router.select_game(len(AVAILABLE_GAMES) - 1)  # Last game
         router.navigate_game_selection(1)  # Go down
 
         # Should wrap to first
@@ -351,6 +362,16 @@ class TestGameLifecycle:
         assert router.current_game.target_words == original_words
         assert router.selected_game_index == 1
 
+    def test_restart_game_same_text_preserves_phrase(self, router):
+        """Restarting with the same text keeps the phrase identity too."""
+        router.select_game(1)
+        router.start_game()
+        original_phrase = router.current_game.phrase_text
+        assert original_phrase is not None
+
+        assert router.restart_game(keep_same_text=True)
+        assert router.current_game.phrase_text == original_phrase
+
     def test_restart_game_new_text(self, router):
         """Test restarting generates fresh content."""
         router.select_game(0)
@@ -359,6 +380,302 @@ class TestGameLifecycle:
         assert router.restart_game()
         assert router.current_game is not None
         assert router.selected_game_index == 0
+
+
+class TestGhostRecording:
+    """Tests for input-snapshot recording and ghost saving."""
+
+    @pytest.fixture
+    def ghost_service(self, tmp_path):
+        """Create a ghost service on a temp database."""
+        repo = SqliteGhostRepository(db_path=tmp_path / "test.db")
+        yield GhostService(repo)
+        repo.close()
+
+    @pytest.fixture
+    def ghost_router(self, tmp_path, ghost_service):
+        """Create a router with history and ghosts sharing one database.
+
+        Ghost runs reference history rows by foreign key, so the
+        production wiring (one SQLite file for both) is reproduced here.
+        """
+        history_repo = SqliteHistoryRepository(db_path=tmp_path / "test.db")
+        yield ApplicationRouter(history_repo, ghost_service)
+        history_repo.close()
+
+    @staticmethod
+    def _type_word(router, word, submit=True):
+        """Feed a word character by character, then optionally submit it."""
+        for i in range(1, len(word) + 1):
+            router.process_game_input(word[:i], is_complete=False)
+        if submit:
+            router.process_game_input(word, is_complete=True)
+
+    def test_phrase_run_records_snapshots(self, ghost_router):
+        """Typing a phrase produces per-input events with submit markers."""
+        ghost_router.select_game(1)
+        ghost_router.start_game()
+        first_word = ghost_router.current_game.target_words[0]
+
+        self._type_word(ghost_router, first_word)
+
+        events = ghost_router.ghost_recorder.recording
+        assert len(events) == len(first_word) + 1
+        assert [e.v for e in events[:-1]] == [
+            first_word[: i + 1] for i in range(len(first_word))
+        ]
+        assert all(e.w == 0 for e in events)
+        assert events[-1].s is True
+        assert all(not e.s for e in events[:-1])
+        # Timing is monotonic and starts at the first keystroke
+        times = [e.t for e in events]
+        assert times == sorted(times)
+        assert times[0] == 0
+
+    def test_random_words_run_records_nothing(self, ghost_router):
+        """Non-phrase games are not recorded."""
+        ghost_router.select_game(0)
+        ghost_router.start_game({"word_count": 5})
+
+        self._type_word(ghost_router, ghost_router.current_game.target_words[0])
+
+        assert ghost_router.ghost_recorder.recording == ()
+
+    def test_recorder_resets_on_new_game(self, ghost_router):
+        """Starting a new game drops the previous run's events."""
+        ghost_router.select_game(1)
+        ghost_router.start_game()
+        self._type_word(ghost_router, ghost_router.current_game.target_words[0])
+        assert ghost_router.ghost_recorder.recording
+
+        ghost_router.restart_game()
+
+        assert ghost_router.ghost_recorder.recording == ()
+
+    def test_finish_auto_saves_qualifying_ghost(self, ghost_router, ghost_service):
+        """A completed phrase run is auto-saved as ghost in AUTO_BEST mode."""
+        ghost_router.select_game(1)
+        ghost_router.start_game()
+        phrase = ghost_router.current_game.phrase_text
+
+        for word in ghost_router.current_game.target_words:
+            self._type_word(ghost_router, word)
+        ghost_router.current_game.start_time -= 60
+
+        result = ghost_router.finish_game()
+        assert result is not None
+
+        ghost = ghost_service.get_ghost_for_phrase(result.phrase_hash)
+        assert ghost is not None
+        assert ghost.phrase_text == phrase
+        assert ghost.wpm == result.wpm
+        assert ghost.recording
+        assert ghost.game_history_id is not None
+
+    def test_finish_without_ghost_service_still_works(self, router):
+        """Routers without a ghost service finish games normally."""
+        router.select_game(1)
+        router.start_game()
+        for word in router.current_game.target_words:
+            self._type_word(router, word)
+
+        assert router.finish_game() is not None
+
+
+class TestGhostRaceEntryPoints:
+    """Tests for starting races: Race a Ghost mode and instant rematch."""
+
+    RACE_GAME_INDEX = 2
+
+    @pytest.fixture
+    def ghost_service(self, tmp_path):
+        """Create a ghost service on a temp database."""
+        repo = SqliteGhostRepository(db_path=tmp_path / "test.db")
+        yield GhostService(repo)
+        repo.close()
+
+    @pytest.fixture
+    def ghost_router(self, tmp_path, ghost_service):
+        """Create a router with history and ghosts sharing one database."""
+        history_repo = SqliteHistoryRepository(db_path=tmp_path / "test.db")
+        yield ApplicationRouter(history_repo, ghost_service)
+        history_repo.close()
+
+    @staticmethod
+    def _finish_phrase_run(router):
+        """Complete the current phrase game and return its result."""
+        for word in router.current_game.target_words:
+            router.process_game_input(word, is_complete=True)
+        router.current_game.start_time -= 60
+        return router.finish_game()
+
+    def test_race_mode_without_ghosts_fails(self, ghost_router):
+        """Race a Ghost cannot start while no ghosts are saved."""
+        ghost_router.select_game(self.RACE_GAME_INDEX)
+
+        assert ghost_router.start_game() is False
+        assert ghost_router.current_game is None
+
+    def test_race_mode_races_a_saved_ghost(self, ghost_router):
+        """Race a Ghost picks a saved ghost and races its phrase."""
+        ghost_router.select_game(1)
+        ghost_router.start_game()
+        result = self._finish_phrase_run(ghost_router)  # auto-saves the ghost
+
+        ghost_router.select_game(self.RACE_GAME_INDEX)
+        assert ghost_router.start_game() is True
+
+        assert ghost_router.active_ghost is not None
+        assert ghost_router.active_ghost.phrase_text == result.phrase_text
+        assert ghost_router.current_game.phrase_text == result.phrase_text
+        assert ghost_router.current_game.target_words == result.phrase_text.split()
+
+    def test_rematch_races_the_finished_phrase(self, ghost_router):
+        """After a saved run, the rematch races the same phrase's ghost."""
+        ghost_router.select_game(1)
+        ghost_router.start_game()
+        result = self._finish_phrase_run(ghost_router)
+
+        assert ghost_router.start_ghost_rematch() is True
+        assert ghost_router.active_ghost is not None
+        assert ghost_router.active_ghost.phrase_text == result.phrase_text
+        assert ghost_router.current_game.phrase_text == result.phrase_text
+        assert ghost_router.is_game_active()
+
+    def test_rematch_without_saved_ghost_fails(self, ghost_router):
+        """The rematch requires a saved ghost for the phrase."""
+        user_preferences.ghost_save_mode = "never"
+        ghost_router.select_game(1)
+        ghost_router.start_game()
+        self._finish_phrase_run(ghost_router)
+
+        assert ghost_router.start_ghost_rematch() is False
+
+    def test_has_ghost_for_current_phrase(self, ghost_router):
+        """Ghost availability for the current phrase is reported correctly."""
+        ghost_router.select_game(1)
+        ghost_router.start_game()
+        assert ghost_router.has_ghost_for_current_phrase() is False
+
+        self._finish_phrase_run(ghost_router)
+
+        assert ghost_router.has_ghost_for_current_phrase() is True
+
+    def test_last_ghost_saved_reflects_auto_save(self, ghost_router):
+        """The router reports when a finished run became the phrase's ghost."""
+        ghost_router.select_game(1)
+        ghost_router.start_game()
+        assert ghost_router.last_ghost_saved is False
+
+        self._finish_phrase_run(ghost_router)  # AUTO_BEST saves it
+
+        assert ghost_router.last_ghost_saved is True
+
+        # An equal rematch run does not replace the ghost
+        assert ghost_router.start_ghost_rematch() is True
+        self._finish_phrase_run(ghost_router)
+        assert ghost_router.last_ghost_saved is False
+
+    def test_race_restart_same_text_survives_ghost_deletion(
+        self, ghost_router, ghost_service
+    ):
+        """A same-text race restart reuses the in-hand ghost, not the DB."""
+        ghost_router.select_game(1)
+        ghost_router.start_game()
+        self._finish_phrase_run(ghost_router)
+
+        ghost_router.select_game(self.RACE_GAME_INDEX)
+        assert ghost_router.start_game() is True
+        racing = ghost_router.active_ghost
+
+        # The ghost disappears from the repo mid-race (Manage Ghosts)
+        ghost_service.repository.delete(racing.id)
+
+        assert ghost_router.restart_game(keep_same_text=True) is True
+        assert ghost_router.active_ghost is racing
+        assert ghost_router.current_game.phrase_text == racing.phrase_text
+
+    def test_finishing_a_race_produces_an_outcome(self, ghost_router):
+        """Finishing while racing records the outcome and ends the race."""
+        ghost_router.select_game(1)
+        ghost_router.start_game()
+        self._finish_phrase_run(ghost_router)
+        assert ghost_router.last_race_outcome is None
+
+        assert ghost_router.start_ghost_rematch() is True
+        outcome_result = self._finish_phrase_run(ghost_router)
+
+        outcome = ghost_router.last_race_outcome
+        assert outcome is not None
+        assert outcome.player_duration == outcome_result.duration
+        assert ghost_router.active_ghost is None
+
+    def test_ask_mode_defers_save_until_confirmed(self, ghost_router, ghost_service):
+        """ALWAYS_ASK holds the run until the user saves it."""
+        user_preferences.ghost_save_mode = "ask"
+        ghost_router.select_game(1)
+        ghost_router.start_game()
+        result = self._finish_phrase_run(ghost_router)
+
+        assert ghost_service.get_ghost_for_phrase(result.phrase_hash) is None
+        assert ghost_router.has_pending_ghost_save() is True
+
+        assert ghost_router.save_pending_ghost() is True
+
+        assert ghost_service.get_ghost_for_phrase(result.phrase_hash) is not None
+        assert ghost_router.has_pending_ghost_save() is False
+        assert ghost_router.last_ghost_saved is True
+        assert ghost_router.save_pending_ghost() is False
+
+    def test_pending_save_discarded_on_new_game(self, ghost_router):
+        """Starting a new game drops an unanswered save prompt."""
+        user_preferences.ghost_save_mode = "ask"
+        ghost_router.select_game(1)
+        ghost_router.start_game()
+        self._finish_phrase_run(ghost_router)
+        assert ghost_router.has_pending_ghost_save() is True
+
+        ghost_router.start_game()
+
+        assert ghost_router.has_pending_ghost_save() is False
+
+
+class TestGhostRaceState:
+    """Tests for the active_ghost race lifecycle."""
+
+    @pytest.fixture
+    def racing_router(self, router):
+        """A router with a phrase game running and a fake active ghost."""
+        router.select_game(1)
+        router.start_game()
+        router.active_ghost = object()  # identity is all that matters here
+        return router
+
+    def test_start_game_clears_active_ghost(self, racing_router):
+        """A fresh game start ends any race."""
+        racing_router.start_game()
+        assert racing_router.active_ghost is None
+
+    def test_restart_same_text_keeps_ghost(self, racing_router):
+        """Restarting the same phrase restarts the race too."""
+        ghost = racing_router.active_ghost
+        assert racing_router.restart_game(keep_same_text=True)
+        assert racing_router.active_ghost is ghost
+
+    def test_restart_new_text_ends_race(self, racing_router):
+        """Moving to a new phrase ends the race."""
+        assert racing_router.restart_game(keep_same_text=False)
+        assert racing_router.active_ghost is None
+
+    def test_cancel_game_ends_race(self, racing_router):
+        """Cancelling the game ends the race."""
+        racing_router.cancel_game()
+        assert racing_router.active_ghost is None
+
+    def test_return_to_menu_ends_race(self, racing_router):
+        """Returning to the menu ends the race."""
+        racing_router.return_to_main_menu()
+        assert racing_router.active_ghost is None
 
 
 class TestStatisticsIntegration:

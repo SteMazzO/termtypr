@@ -3,8 +3,8 @@
 import typer
 
 from termtypr.data.word_storage import WordStorage
-from termtypr.infrastructure.persistence.json_history_repository import (
-    JsonHistoryRepository,
+from termtypr.infrastructure.persistence.sqlite_history_repository import (
+    SqliteHistoryRepository,
 )
 from termtypr.ui.main_app import run_new_app
 
@@ -30,7 +30,7 @@ def start():
 
 @app.command()
 def add_words(
-    words: list[str] = typer.Argument(None, help="Words to add to the storage")  #  noqa
+    words: list[str] = typer.Argument(None, help="Words to add to the storage"),  #  noqa
 ):
     """Add words to the word storage."""
     if not words:
@@ -49,7 +49,7 @@ def add_words(
 @app.command()
 def stats():
     """Show typing test statistics."""
-    repository = JsonHistoryRepository()
+    repository = SqliteHistoryRepository()
     all_results = repository.get_all()
 
     if not all_results:
@@ -87,7 +87,7 @@ def list_words():
 
     typer.echo(f"Total words in storage: {len(words)}")
     for i, word in enumerate(sorted(words)):
-        typer.echo(f"  {i+1}. {word}")
+        typer.echo(f"  {i + 1}. {word}")
 
 
 if __name__ == "__main__":

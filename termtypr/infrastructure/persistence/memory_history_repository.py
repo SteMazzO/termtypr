@@ -14,7 +14,11 @@ class InMemoryHistoryRepository(HistoryRepository):
         self._results: list[GameResult] = []
 
     def save(self, result: GameResult) -> None:
-        """Save a game result to memory."""
+        """Save a game result to memory.
+
+        Returns None: in-memory storage has no meaningful record identifier
+        (anything else would leak into foreign keys as if it were real).
+        """
         self._results.append(result)
 
     def get_all(self, sort: Literal["asc", "desc"] = "desc") -> list[GameResult]:
