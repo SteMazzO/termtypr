@@ -50,3 +50,6 @@ data/history.json
 # Editor files
 .vscode/
 .idea/
+
+# UV
+uv.lock
